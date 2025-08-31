@@ -124,11 +124,11 @@ pub async fn start_server(callback: CallbackFunc) {
         )
         .with_state(shared_state);
 
-    let Ok(port) = env::var("CALLBACK_HTTP_PORT") else {
-        panic!("CALLBACK_HTTP_PORT not set");
+    let Ok(listen) = env::var("CALLBACK_HTTP_LISTEN") else {
+        panic!("CALLBACK_HTTP_LISTEN not set");
     };
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port.parse::<u16>().unwrap()));
+    let addr: SocketAddr = listen.parse().unwrap();
     info!("正在监听端口 http://{addr} ...");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

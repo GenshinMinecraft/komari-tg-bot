@@ -5,7 +5,7 @@ mod db;
 mod http_webhook;
 
 use crate::connection::first_init_read;
-use crate::connection::ws_get::get_node_id::ws_get_node_id;
+use crate::connection::ws_get::get_node_id::{get_node_id_by_name, ws_get_node_id};
 use crate::connection::ws_get::status::{
     make_keyboard_for_single, parse_ws_single_server_by_index,
 };
@@ -30,9 +30,10 @@ struct Config {
     db_file: String,
     telegram_token: String,
     bot_name: String,
-    callback_http_port: u16,
+    callback_http_listen: String,
     callback_http_url: String,
     log_level: String,
+    admin_id: i64,
 }
 
 #[tokio::main]
@@ -51,9 +52,10 @@ async fn main() {
 
     unsafe {
         env::set_var("TG_TOKEN", config.telegram_token.clone());
-        env::set_var("CALLBACK_HTTP_PORT", config.callback_http_port.to_string());
+        env::set_var("CALLBACK_HTTP_LISTEN", config.callback_http_listen);
         env::set_var("CALLBACK_HTTP_URL", config.callback_http_url.clone());
-        env::set_var("BOT_NAME", config.bot_name.clone())
+        env::set_var("BOT_NAME", config.bot_name.clone());
+        env::set_var("ADMIN_ID", config.admin_id.to_string())
     };
 
     info!("Starting...");
@@ -112,7 +114,8 @@ enum Command {
     Update,
     GetNodeId,
     TotalStatus,
-    Status { node_id: i32 },
+    StatusId { node_id: i32 },
+    Status { node_name: String },
     GenerateNotificationToken,
 }
 
@@ -146,9 +149,9 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
         "update" => Ok(Some(Command::Update)),
         "get_node_id" => Ok(Some(Command::GetNodeId)),
         "total_status" => Ok(Some(Command::TotalStatus)),
-        "status" => {
+        "status_id" => {
             let node_id = args.first().unwrap_or(&"1").parse::<i32>().unwrap_or(1);
-            Ok(Some(Command::Status { node_id }))
+            Ok(Some(Command::StatusId { node_id }))
         }
         "generate_notification_token" => Ok(Some(Command::GenerateNotificationToken)),
         _ => Ok(None),
@@ -186,9 +189,10 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 /disconnect - 断开已保存的连接
 /update - 更新已保存的连接 (增删服务器或疑难杂症可使用\)
 
-/get_node_id - 获取所有节点的 ID (仅本 Bot\)
 /total_status - 获取所有节点的运行状态
-/status NODE_ID - 获取指定节点的运行状态
+/status NODE_NAME - 获取指定节点的运行状态 (第一个包含 NODE_NAME 字符串的节点)
+/get_node_id - 获取所有节点的 ID (仅本 Bot\)
+/status_id NODE_ID - 获取指定节点 ID (使用 /get_node_id 获取节点的 ID) 的运行状态
 
 /generate_notification_token - 生成通知令牌
 ",
@@ -386,7 +390,53 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 
             Ok(())
         }
-        Command::Status { node_id } => {
+        Command::Status { node_name } => {
+            let telegram_id = if let Some(user) = msg.clone().from {
+                user.id.0 as i64
+            } else {
+                return Ok(());
+            };
+
+            let node_id = match get_node_id_by_name(msg.clone(), node_name).await {
+                Ok(node_id) => node_id,
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("无法获取节点ID: {e}"))
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
+                    return Ok(());
+                }
+            };
+
+            let msg_str = match parse_ws_single_server_by_index(telegram_id, node_id).await {
+                Ok(msg) => msg,
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
+                    return Ok(());
+                }
+            };
+
+            let keyboard = match make_keyboard_for_single(node_id, telegram_id).await {
+                Ok(key) => key,
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("无法生成键盘: {e}"))
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
+                    return Ok(());
+                }
+            };
+
+            bot.send_message(msg.chat.id, msg_str)
+                .parse_mode(ParseMode::MarkdownV2)
+                .reply_parameters(ReplyParameters::new(msg.id))
+                .reply_markup(keyboard)
+                .disable_link_preview(true)
+                .await?;
+
+            Ok(())
+        }
+        Command::StatusId { node_id } => {
             let telegram_id = if let Some(user) = msg.from {
                 user.id.0 as i64
             } else {
