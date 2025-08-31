@@ -149,6 +149,10 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
         "update" => Ok(Some(Command::Update)),
         "get_node_id" => Ok(Some(Command::GetNodeId)),
         "total_status" => Ok(Some(Command::TotalStatus)),
+        "status" => {
+            let node_name = args.first().ok_or("缺少节点名称")?;
+            Ok(Some(Command::Status { node_name: node_name.to_string() }))
+        }
         "status_id" => {
             let node_id = args.first().unwrap_or(&"1").parse::<i32>().unwrap_or(1);
             Ok(Some(Command::StatusId { node_id }))
