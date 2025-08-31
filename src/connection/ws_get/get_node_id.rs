@@ -1,7 +1,6 @@
-use crate::connection::msg_fixer;
 use crate::connection::ws_get::status::sort_ws_data;
-use crate::connection::ws_get::{ApiWsDataHashMapValue, get_ws};
-use crate::{ErrorString, connection};
+use crate::connection::ws_get::{get_ws, ApiWsDataHashMapValue};
+use crate::{connection, ErrorString};
 use teloxide::prelude::Message;
 use tokio::task::JoinHandle;
 
@@ -9,9 +8,15 @@ pub async fn get_node_id_by_name(msg: Message, name: String) -> Result<i32, Erro
     let node_id_string = ws_get_node_id(msg).await?;
 
     for line in node_id_string.lines() {
-        let (node_id, node_name) = line.split_once(" - ").ok_or(String::from("无法解析节点信息"))?;
+        let (node_id, node_name) = line
+            .split_once(" - ")
+            .ok_or(String::from("无法解析节点信息"))?;
+
         if node_name.contains(name.as_str()) {
-            return Ok(node_id.parse::<i32>().map_err(|_| "无法解析节点ID")?);
+            return Ok(node_id
+                .trim_matches('`')
+                .parse::<i32>()
+                .map_err(|_| "无法解析节点ID")?);
         }
     }
 
@@ -57,5 +62,5 @@ pub async fn ws_get_node_id(msg: Message) -> Result<String, ErrorString> {
         message_str.push_str(&format!("`{}` - {}\n", counter, node.name));
     }
 
-    Ok(msg_fixer(message_str))
+    Ok(message_str)
 }

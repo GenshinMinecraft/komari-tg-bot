@@ -4,14 +4,14 @@ mod connection;
 mod db;
 mod http_webhook;
 
-use crate::connection::first_init_read;
 use crate::connection::ws_get::get_node_id::{get_node_id_by_name, ws_get_node_id};
 use crate::connection::ws_get::status::{
     make_keyboard_for_single, parse_ws_single_server_by_index,
 };
 use crate::connection::ws_get::total_status::parse_ws_total_status;
+use crate::connection::{first_init_read, msg_fixer};
 use crate::http_webhook::generate_notification_token;
-use db::{DB_POOL, Monitor, connect_db, create_table, delete_monitor, insert_monitor};
+use db::{connect_db, create_table, delete_monitor, insert_monitor, Monitor, DB_POOL};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -151,7 +151,9 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
         "total_status" => Ok(Some(Command::TotalStatus)),
         "status" => {
             let node_name = args.first().ok_or("缺少节点名称")?;
-            Ok(Some(Command::Status { node_name: node_name.to_string() }))
+            Ok(Some(Command::Status {
+                node_name: node_name.to_string(),
+            }))
         }
         "status_id" => {
             let node_id = args.first().unwrap_or(&"1").parse::<i32>().unwrap_or(1);
@@ -163,7 +165,12 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    if msg.clone().from.map(|user| user.is_channel()).unwrap_or(true) {
+    if msg
+        .clone()
+        .from
+        .map(|user| user.is_channel())
+        .unwrap_or(true)
+    {
         return Ok(());
     }
 
@@ -356,7 +363,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         }
         Command::GetNodeId => match ws_get_node_id(msg.clone()).await {
             Ok(message) => {
-                bot.send_message(msg.chat.id, message)
+                bot.send_message(msg.chat.id, msg_fixer(message))
                     .parse_mode(ParseMode::MarkdownV2)
                     .reply_parameters(ReplyParameters::new(msg.id))
                     .await?;
