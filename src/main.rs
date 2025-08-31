@@ -11,7 +11,7 @@ use crate::connection::ws_get::status::{
 use crate::connection::ws_get::total_status::parse_ws_total_status;
 use crate::connection::{first_init_read, msg_fixer};
 use crate::http_webhook::generate_notification_token;
-use db::{connect_db, create_table, delete_monitor, insert_monitor, Monitor, DB_POOL};
+use db::{DB_POOL, Monitor, connect_db, create_table, delete_monitor, insert_monitor};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -149,12 +149,12 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
         "update" => Ok(Some(Command::Update)),
         "get_node_id" => Ok(Some(Command::GetNodeId)),
         "total_status" => Ok(Some(Command::TotalStatus)),
-        "status" => {
-            let node_name = args.first().ok_or("缺少节点名称")?;
-            Ok(Some(Command::Status {
+        "status" => match args.first() {
+            None => Ok(Some(Command::StatusId { node_id: 1 })),
+            Some(node_name) => Ok(Some(Command::Status {
                 node_name: node_name.to_string(),
-            }))
-        }
+            })),
+        },
         "status_id" => {
             let node_id = args.first().unwrap_or(&"1").parse::<i32>().unwrap_or(1);
             Ok(Some(Command::StatusId { node_id }))
@@ -201,7 +201,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 /update - 更新已保存的连接 (增删服务器或疑难杂症可使用\)
 
 /total_status - 获取所有节点的运行状态
-/status NODE_NAME - 获取指定节点的运行状态 (第一个包含 NODE_NAME 字符串的节点)
+/status NODE_NAME - 获取指定节点的运行状态 (第一个包含 NODE_NAME 字符串的节点，若未传入则等同于 /status_id 1\)
 /get_node_id - 获取所有节点的 ID (仅本 Bot\)
 /status_id NODE_ID - 获取指定节点 ID (使用 /get_node_id 获取节点的 ID) 的运行状态
 

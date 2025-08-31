@@ -1,7 +1,7 @@
 use crate::connection::msg_fixer;
-use crate::connection::ws_get::{get_ws, ApiWs};
-use crate::db::{query_monitor_by_telegram_id, DB_POOL};
-use crate::{connection, ErrorString};
+use crate::connection::ws_get::{ApiWs, get_ws};
+use crate::db::{DB_POOL, query_monitor_by_telegram_id};
+use crate::{ErrorString, connection};
 use tokio::task::JoinHandle;
 
 pub async fn parse_ws_total_status(telegram_id: i64) -> Result<String, ErrorString> {
