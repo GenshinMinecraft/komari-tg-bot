@@ -1,4 +1,4 @@
-use crate::ErrorString;
+use crate::{ErrorString, TelegramId};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{FromRow, Pool, Sqlite};
 use teloxide::types::Message;
@@ -9,12 +9,7 @@ pub static DB_POOL: OnceCell<Pool<Sqlite>> = OnceCell::const_new();
 #[derive(Debug, FromRow, Clone)]
 pub struct Monitor {
     pub telegram_id: u64,
-    pub monitor_http_url: String,
-    pub monitor_ws_url: String,
-    pub total_server_count: u32,
-    pub site_name: String,
-    pub site_description: String,
-    pub komari_version: String,
+    pub monitor_url: String,
     pub notification_token: Option<String>,
 }
 
@@ -38,12 +33,7 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
         "CREATE TABLE IF NOT EXISTS monitor (
              id INTEGER PRIMARY KEY,
              telegram_id INTEGER NOT NULL UNIQUE,
-             monitor_http_url TEXT NOT NULL,
-             monitor_ws_url TEXT,
-             total_server_count INTEGER NOT NULL,
-             site_name TEXT NOT NULL,
-             site_description TEXT NOT NULL,
-             komari_version TEXT NOT NULL,
+             monitor_url TEXT NOT NULL,
              notification_token TEXT
          )",
     )
@@ -59,16 +49,16 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
 
 pub async fn query_monitor_by_telegram_id(
     pool: &Pool<Sqlite>,
-    telegram_id: i64,
+    telegram_id: TelegramId,
 ) -> Result<Option<Monitor>, ErrorString> {
     let monitor_result = sqlx::query_as::<_, Monitor>(
-        "SELECT telegram_id, monitor_http_url, monitor_ws_url, total_server_count, site_name, site_description, komari_version, notification_token
+        "SELECT telegram_id, monitor_url, notification_token
          FROM monitor
          WHERE telegram_id = ?",
     )
-        .bind(telegram_id)
-        .fetch_optional(pool)
-        .await;
+    .bind(telegram_id)
+    .fetch_optional(pool)
+    .await;
 
     if let Ok(monitor_result) = monitor_result {
         Ok(monitor_result)
@@ -83,16 +73,11 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
     }
 
     if sqlx::query(
-        "INSERT OR IGNORE INTO monitor (telegram_id, monitor_http_url, monitor_ws_url, total_server_count, site_name, site_description, komari_version, notification_token)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO monitor (telegram_id, monitor_url, notification_token)
+         VALUES (?, ?, ?)",
     )
         .bind(monitor.telegram_id as i64)
-        .bind(monitor.monitor_http_url)
-        .bind(monitor.monitor_ws_url)
-        .bind(monitor.total_server_count)
-        .bind(monitor.site_name)
-        .bind(monitor.site_description)
-        .bind(monitor.komari_version)
+        .bind(monitor.monitor_url)
         .bind(monitor.notification_token)
         .execute(pool)
         .await
@@ -104,13 +89,7 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
     }
 }
 
-pub async fn delete_monitor(pool: &Pool<Sqlite>, msg: Message) -> Result<(), ErrorString> {
-    let telegram_id = if let Some(user) = msg.from {
-        user.id.0 as i64
-    } else {
-        return Err(String::from("无法获取用户ID"));
-    };
-
+pub async fn delete_monitor(pool: &Pool<Sqlite>, telegram_id: TelegramId) -> Result<(), ErrorString> {
     let _ = sqlx::query("DELETE FROM monitor WHERE telegram_id = ?")
         .bind(telegram_id)
         .execute(pool)
@@ -122,7 +101,7 @@ pub async fn delete_monitor(pool: &Pool<Sqlite>, msg: Message) -> Result<(), Err
 
 pub async fn update_notification_token(
     pool: &Pool<Sqlite>,
-    telegram_id: i64,
+    telegram_id: TelegramId,
     token: String,
 ) -> Result<(), ErrorString> {
     let result = sqlx::query("UPDATE monitor SET notification_token = ? WHERE telegram_id = ?")
@@ -136,3 +115,14 @@ pub async fn update_notification_token(
         Err(e) => Err(format!("更新 notification_token 失败: {e}")),
     }
 }
+
+pub async fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
+    let telegram_id = if let Some(user) = msg.from.clone() {
+        user.id.0 as i64
+    } else {
+        return Err(String::from("无法获取用户ID"));
+    };
+
+    Ok(telegram_id)
+}
+

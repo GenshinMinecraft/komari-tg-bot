@@ -1,8 +1,8 @@
 #![warn(clippy::all, clippy::pedantic)]
 
-mod connection;
 mod db;
 mod http_webhook;
+mod json_rpc;
 
 use crate::connection::ws_get::get_node_id::{get_node_id_by_name, ws_get_node_id};
 use crate::connection::ws_get::status::{
@@ -24,6 +24,8 @@ use teloxide::types::{ParseMode, ReplyParameters};
 use teloxide::utils::command::parse_command;
 
 pub type ErrorString = String;
+pub type MessageString = String; // With formated but did not escape
+pub type TelegramId = i64;
 
 #[derive(Deserialize, Serialize, Clone)]
 struct Config {
