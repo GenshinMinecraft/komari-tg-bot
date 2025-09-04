@@ -20,16 +20,21 @@ async fn get_node_id_list(telegram_id: TelegramId) -> Result<(MessageString, All
     node_list.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut message_str = String::new();
+    {
+        let mut counter = 0;
 
-    let mut counter = 0;
+        for (node_uuid, node) in node_list.clone() {
+            counter += 1;
 
-    for (node_uuid, node) in node_list {
-        counter += 1;
+            // 查找uuid相符的节点并获取其名称
+            let node_name = all_info.common_nodes.values()
+                .find(|n| n.uuid == node_uuid)
+                .map(|n| n.name.clone())
+                .unwrap_or_else(|| "未知节点".to_string());
 
-
-
-        message_str.push_str(&format!("`{}` - {}\n", counter, node_name));
+            message_str.push_str(&format!("`{}` - {}\n", counter, node_name));
+        }
     }
 
-    todo!()
+    Ok((message_str, all_info, node_list))
 }
