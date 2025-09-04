@@ -1,5 +1,6 @@
-mod query;
 mod connect;
+mod query;
+mod get_node_id;
 
 use crate::ErrorString;
 use reqwest::Client;
@@ -42,4 +43,3 @@ pub fn bytes_to_pretty_string<T: Into<i64>>(bytes: T) -> String {
         format!("{:.2} {}", size, UNITS[unit_index])
     }
 }
-

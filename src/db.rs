@@ -89,7 +89,10 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
     }
 }
 
-pub async fn delete_monitor(pool: &Pool<Sqlite>, telegram_id: TelegramId) -> Result<(), ErrorString> {
+pub async fn delete_monitor(
+    pool: &Pool<Sqlite>,
+    telegram_id: TelegramId,
+) -> Result<(), ErrorString> {
     let _ = sqlx::query("DELETE FROM monitor WHERE telegram_id = ?")
         .bind(telegram_id)
         .execute(pool)
@@ -125,4 +128,3 @@ pub async fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
 
     Ok(telegram_id)
 }
-

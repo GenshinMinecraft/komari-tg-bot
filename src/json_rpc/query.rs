@@ -71,7 +71,6 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
         .await
         .map_err(|e| ErrorString::from(format!("解析错误: {e}")))?;
 
-
     let rpc_help: RpcHelp = serde_json::from_value(
         json_rpc_response_body
             .iter()
