@@ -1,8 +1,8 @@
-use crate::ErrorString;
-use crate::connection::api_nodes::{ApiNodes, get_api_nodes};
+use crate::connection::api_nodes::{get_api_nodes, ApiNodes};
 use crate::connection::msg_fixer;
-use crate::connection::ws_get::{ApiWs, ApiWsDataHashMapValue, get_ws};
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
+use crate::connection::ws_get::{get_ws, ApiWs, ApiWsDataHashMapValue};
+use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::ErrorString;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use tokio::task::JoinHandle;
@@ -59,10 +59,10 @@ pub async fn parse_ws_single_server_by_index(
             .unwrap_or_else(|| panic!("数据库连接池未初始化")),
         telegram_id,
     )
-    .await?
-    .ok_or(String::from(
-        "服务器未连接，请先使用 /connect [http url] [ws url] 连接",
-    ))?;
+        .await?
+        .ok_or(String::from(
+            "服务器未连接，请先使用 /connect [http url] [ws url] 连接",
+        ))?;
 
     let (ws_data, nodes) = tokio::try_join!(ws_handle, http_handle)
         .map_err(|e| format!("无法运行 Tokio 线程: {e}"))?;

@@ -1,11 +1,9 @@
 mod query;
 mod connect;
 
-use crate::{db, ErrorString, TelegramId};
+use crate::ErrorString;
 use reqwest::Client;
 use tokio::sync::OnceCell;
-use crate::db::{Monitor, DB_POOL};
-use crate::json_rpc::query::AllInfo;
 
 pub static REQWEST_CLIENT: OnceCell<reqwest::Client> = OnceCell::const_new();
 

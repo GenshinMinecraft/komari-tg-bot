@@ -1,6 +1,6 @@
-use crate::ErrorString;
 use crate::connection::create_reqwest_client;
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
+use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::ErrorString;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -24,7 +24,7 @@ pub async fn get_api_version(telegram_id: i64) -> Result<ApiVersion, ErrorString
             .unwrap_or_else(|| panic!("数据库连接池未初始化")),
         telegram_id,
     )
-    .await?;
+        .await?;
 
     let url = if let Some(monitor) = monitor {
         format!("{}/api/version", monitor.monitor_http_url)

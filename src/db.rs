@@ -37,9 +37,9 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
              notification_token TEXT
          )",
     )
-    .execute(pool)
-    .await
-    .is_ok()
+        .execute(pool)
+        .await
+        .is_ok()
     {
         Ok(())
     } else {
@@ -56,9 +56,9 @@ pub async fn query_monitor_by_telegram_id(
          FROM monitor
          WHERE telegram_id = ?",
     )
-    .bind(telegram_id)
-    .fetch_optional(pool)
-    .await;
+        .bind(telegram_id)
+        .fetch_optional(pool)
+        .await;
 
     if let Ok(monitor_result) = monitor_result {
         Ok(monitor_result)

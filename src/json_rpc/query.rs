@@ -1,5 +1,5 @@
-use crate::ErrorString;
 use crate::json_rpc::create_reqwest_client;
+use crate::ErrorString;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -71,7 +71,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
         .await
         .map_err(|e| ErrorString::from(format!("解析错误: {e}")))?;
 
-    
+
     let rpc_help: RpcHelp = serde_json::from_value(
         json_rpc_response_body
             .iter()
@@ -80,8 +80,8 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 1 的响应: {e}"))?;
-    
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 1 的响应: {e}"))?;
+
     let rpc_methods: RpcMethods = serde_json::from_value(
         json_rpc_response_body
             .iter()
@@ -90,7 +90,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 2 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 2 的响应: {e}"))?;
 
     let rpc_ping: RpcPing = serde_json::from_value(
         json_rpc_response_body
@@ -100,7 +100,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 3 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 3 的响应: {e}"))?;
 
     let rpc_version: RpcVersion = serde_json::from_value(
         json_rpc_response_body
@@ -110,7 +110,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 4 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 4 的响应: {e}"))?;
 
     let common_get_public_info: CommonGetPublicInfo = serde_json::from_value(
         json_rpc_response_body
@@ -120,7 +120,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 5 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 5 的响应: {e}"))?;
 
     let common_get_nodes: CommonGetNodes = serde_json::from_value(
         json_rpc_response_body
@@ -130,7 +130,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 6 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 6 的响应: {e}"))?;
 
     let common_get_nodes_latest_status: CommonGetNodesLatestStatus = serde_json::from_value(
         json_rpc_response_body
@@ -140,7 +140,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 7 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 7 的响应: {e}"))?;
 
     let common_get_me: CommonGetMe = serde_json::from_value(
         json_rpc_response_body
@@ -150,7 +150,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
             .result
             .clone(),
     )
-    .map_err(|e| format!("Json 解析错误: 未找到 id 为 8 的响应: {e}"))?;
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 8 的响应: {e}"))?;
 
     Ok(AllInfo {
         rpc_help,

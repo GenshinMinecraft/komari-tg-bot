@@ -11,7 +11,7 @@ use crate::connection::ws_get::status::{
 use crate::connection::ws_get::total_status::parse_ws_total_status;
 use crate::connection::{first_init_read, msg_fixer};
 use crate::http_webhook::generate_notification_token;
-use db::{DB_POOL, Monitor, connect_db, create_table, delete_monitor, insert_monitor};
+use db::{connect_db, create_table, delete_monitor, insert_monitor, Monitor, DB_POOL};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ async fn main() {
         "error" => log::Level::Error,
         _ => log::Level::Info,
     })
-    .unwrap();
+        .unwrap();
 
     unsafe {
         env::set_var("TG_TOKEN", config.telegram_token.clone());
@@ -210,9 +210,9 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 /generate_notification_token - 生成通知令牌
 ",
             )
-            .reply_parameters(ReplyParameters::new(msg.id))
-            .disable_link_preview(true)
-            .await?;
+                .reply_parameters(ReplyParameters::new(msg.id))
+                .disable_link_preview(true)
+                .await?;
             Ok(())
         }
         Command::Connect { http_url } => {
@@ -280,7 +280,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                     notification_token: None,
                 },
             )
-            .await
+                .await
             {
                 Ok(()) => {
                     bot.send_message(msg.chat.id, "已保存监控信息")
@@ -299,8 +299,8 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                                 msg.chat.id,
                                 format!("获取站点信息失败，已自动删除用户信息: {e}"),
                             )
-                            .reply_parameters(ReplyParameters::new(msg.id))
-                            .await?;
+                                .reply_parameters(ReplyParameters::new(msg.id))
+                                .await?;
 
                             match delete_monitor(db_pool, msg.clone()).await {
                                 Ok(()) => return Ok(()),
@@ -309,8 +309,8 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                                         msg.chat.id,
                                         format!("取消连接到 Komari 失败: {e}"),
                                     )
-                                    .reply_parameters(ReplyParameters::new(msg.id))
-                                    .await?;
+                                        .reply_parameters(ReplyParameters::new(msg.id))
+                                        .await?;
                                 }
                             }
                         }

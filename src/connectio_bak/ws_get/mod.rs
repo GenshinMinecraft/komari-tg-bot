@@ -2,16 +2,16 @@ pub mod get_node_id;
 pub mod status;
 pub mod total_status;
 
+use crate::db::{query_monitor_by_telegram_id, DB_POOL};
 use crate::ErrorString;
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use futures::{SinkExt, StreamExt};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::handshake::client::{Request, generate_key};
+use tokio_tungstenite::tungstenite::handshake::client::{generate_key, Request};
 use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 pub async fn connect_ws(
     http_url: &str,
@@ -122,7 +122,7 @@ pub async fn get_ws(telegram_id: i64) -> Result<ApiWs, ErrorString> {
             .unwrap_or_else(|| panic!("数据库连接池未初始化")),
         telegram_id,
     )
-    .await?;
+        .await?;
 
     let (http_url, ws_url) = if let Some(monitor) = monitor {
         (monitor.monitor_http_url, monitor.monitor_ws_url)

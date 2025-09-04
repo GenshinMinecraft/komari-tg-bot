@@ -1,7 +1,7 @@
 use crate::connection::msg_fixer;
-use crate::connection::ws_get::{ApiWs, get_ws};
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
-use crate::{ErrorString, connection};
+use crate::connection::ws_get::{get_ws, ApiWs};
+use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::{connection, ErrorString};
 use tokio::task::JoinHandle;
 
 pub async fn parse_ws_total_status(telegram_id: i64) -> Result<String, ErrorString> {
@@ -36,10 +36,10 @@ pub async fn parse_ws_total_status(telegram_id: i64) -> Result<String, ErrorStri
             .unwrap_or_else(|| panic!("数据库连接池未初始化")),
         telegram_id,
     )
-    .await?
-    .ok_or(String::from(
-        "服务器未连接，请先使用 /connect [http url] 连接",
-    ))?;
+        .await?
+        .ok_or(String::from(
+            "服务器未连接，请先使用 /connect [http url] 连接",
+        ))?;
 
     let online_nodes_count = ws_data.data.online.len();
     let total_nodes_count = monitor.total_server_count;

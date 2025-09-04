@@ -3,8 +3,8 @@ pub mod api_public;
 pub mod api_version;
 pub mod ws_get;
 
+use crate::db::{delete_monitor, insert_monitor, query_monitor_by_telegram_id, Monitor, DB_POOL};
 use crate::ErrorString;
-use crate::db::{DB_POOL, Monitor, delete_monitor, insert_monitor, query_monitor_by_telegram_id};
 use reqwest::Client;
 use teloxide::types::Message;
 use tokio::sync::OnceCell;
@@ -80,7 +80,7 @@ pub async fn first_init_read(msg: Message) -> Result<String, ErrorString> {
             notification_token: None,
         },
     )
-    .await
+        .await
     {
         return Err(format!("无法更新数据库: {e}"));
     }
