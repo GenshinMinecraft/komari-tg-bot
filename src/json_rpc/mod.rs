@@ -1,6 +1,6 @@
 mod connect;
-mod query;
 mod get_node_id;
+mod query;
 
 use crate::ErrorString;
 use reqwest::Client;

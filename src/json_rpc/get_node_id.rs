@@ -1,11 +1,13 @@
-use crate::{ErrorString, MessageString, TelegramId};
-use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::query::{AllInfo, CommonGetNodesLatestStatusSingle};
+use crate::{ErrorString, MessageString, TelegramId};
 
 type NodeUuid = String;
 type SortedNodeList = Vec<(NodeUuid, CommonGetNodesLatestStatusSingle)>;
 
-async fn get_node_id_list(telegram_id: TelegramId) -> Result<(MessageString, AllInfo, SortedNodeList), ErrorString> {
+async fn get_node_id_list(
+    telegram_id: TelegramId,
+) -> Result<(MessageString, AllInfo, SortedNodeList), ErrorString> {
     let db = DB_POOL.get().ok_or(String::from("无法获取数据库"))?;
 
     let Some(monitor) = query_monitor_by_telegram_id(db, telegram_id).await? else {
@@ -16,7 +18,11 @@ async fn get_node_id_list(telegram_id: TelegramId) -> Result<(MessageString, All
 
     let all_info = crate::json_rpc::query::get_all_info(&monitor.monitor_url).await?;
 
-    let mut node_list = all_info.common_nodes_latest_status.iter().map(|(node_uuid, node_name)| (node_uuid.clone(), node_name.clone())).collect::<Vec<_>>();
+    let mut node_list = all_info
+        .common_nodes_latest_status
+        .iter()
+        .map(|(node_uuid, node_name)| (node_uuid.clone(), node_name.clone()))
+        .collect::<Vec<_>>();
     node_list.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut message_str = String::new();
@@ -27,7 +33,9 @@ async fn get_node_id_list(telegram_id: TelegramId) -> Result<(MessageString, All
             counter += 1;
 
             // 查找uuid相符的节点并获取其名称
-            let node_name = all_info.common_nodes.values()
+            let node_name = all_info
+                .common_nodes
+                .values()
                 .find(|n| n.uuid == node_uuid)
                 .map(|n| n.name.clone())
                 .unwrap_or_else(|| "未知节点".to_string());
