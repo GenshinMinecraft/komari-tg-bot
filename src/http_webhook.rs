@@ -1,6 +1,6 @@
-use crate::connection::create_reqwest_client;
-use crate::db::query_monitor_by_telegram_id;
-use crate::{ErrorString, Message, db};
+use crate::db::{get_telegram_id, query_monitor_by_telegram_id};
+use crate::json_rpc::create_reqwest_client;
+use crate::{ErrorString, Message, TelegramId, db};
 use axum::{
     Router,
     extract::{Path, State},
@@ -135,13 +135,7 @@ pub async fn start_server(callback: CallbackFunc) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub async fn generate_notification_token(msg: Message) -> Result<String, ErrorString> {
-    let telegram_id = if let Some(user) = msg.clone().from {
-        user.id.0 as i64
-    } else {
-        return Err(String::from("无法获取用户ID"));
-    };
-
+pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<String, ErrorString> {
     let new_uuid = uuid::Uuid::new_v4().to_string();
 
     let db_pool = db::DB_POOL

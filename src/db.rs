@@ -119,7 +119,7 @@ pub async fn update_notification_token(
     }
 }
 
-pub async fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
+pub fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
     let telegram_id = if let Some(user) = msg.from.clone() {
         user.id.0 as i64
     } else {

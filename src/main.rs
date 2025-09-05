@@ -4,14 +4,12 @@ mod db;
 mod http_webhook;
 mod json_rpc;
 
-use crate::connection::ws_get::get_node_id::{get_node_id_by_name, ws_get_node_id};
-use crate::connection::ws_get::status::{
-    make_keyboard_for_single, parse_ws_single_server_by_index,
-};
-use crate::connection::ws_get::total_status::parse_ws_total_status;
-use crate::connection::{first_init_read, msg_fixer};
+use crate::db::get_telegram_id;
 use crate::http_webhook::generate_notification_token;
-use db::{DB_POOL, Monitor, connect_db, create_table, delete_monitor, insert_monitor};
+use crate::json_rpc::connect::{connect_komari_with_update_db, update_connection};
+use crate::json_rpc::get_node_id::get_node_id_list;
+use crate::json_rpc::status::{get_node_id_by_name, make_keyboard_for_single, status_with_id};
+use db::{DB_POOL, connect_db, create_table, delete_monitor, insert_monitor};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -26,6 +24,26 @@ use teloxide::utils::command::parse_command;
 pub type ErrorString = String;
 pub type MessageString = String; // With formated but did not escape
 pub type TelegramId = i64;
+
+pub fn msg_fixer(msg: MessageString) -> String {
+    msg.replace('.', r"\.")
+        .replace('-', r"\-")
+        .replace('|', r"\|")
+        .replace('(', r"\(")
+        .replace(')', r"\)")
+        .replace('#', r"\#")
+        .replace('+', r"\+")
+        .replace('=', r"\=")
+        .replace('{', r"\{")
+        .replace('}', r"\}")
+        .replace('[', r"\[")
+        .replace(']', r"\]")
+        .replace('_', r"\_")
+        .replace('>', r"\>")
+        .replace('<', r"\<")
+        .replace('&', r"\&")
+        .replace('!', r"\!")
+}
 
 #[derive(Deserialize, Serialize, Clone)]
 struct Config {
@@ -167,6 +185,11 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
+    let telegram_id = match get_telegram_id(&msg) {
+        Ok(tg_id) => tg_id,
+        Err(_) => return Ok(()),
+    };
+
     if msg
         .clone()
         .from
@@ -216,16 +239,6 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Ok(())
         }
         Command::Connect { http_url } => {
-            let db_pool = DB_POOL
-                .get()
-                .unwrap_or_else(|| panic!("数据库连接池未初始化"));
-
-            let telegram_id = if let Some(user) = msg.clone().from {
-                user.id.0 as i64
-            } else {
-                return Ok(());
-            };
-
             let url = match Url::parse(&http_url) {
                 Ok(url) => url,
                 Err(e) => {
@@ -253,85 +266,27 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 
             let http_url = format!("{}://{}{}", url.scheme(), host, port);
 
-            let ws_scheme = match url.scheme() {
-                "http" => "ws",
-                "https" => "wss",
-                _ => {
-                    bot.send_message(msg.chat.id, "无效的 URL")
+            match connect_komari_with_update_db(http_url, telegram_id).await {
+                Ok(message) => {
+                    bot.send_message(msg.chat.id, msg_fixer(message))
+                        .parse_mode(ParseMode::MarkdownV2)
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
-                    return Ok(());
-                }
-            };
-
-            let ws_url = format!("{ws_scheme}://{host}{port}");
-
-            match insert_monitor(
-                db_pool,
-                Monitor {
-                    telegram_id: telegram_id as u64,
-                    monitor_http_url: http_url,
-                    monitor_ws_url: ws_url,
-
-                    total_server_count: Default::default(),
-                    site_name: Default::default(),
-                    site_description: Default::default(),
-                    komari_version: Default::default(),
-                    notification_token: None,
-                },
-            )
-            .await
-            {
-                Ok(()) => {
-                    bot.send_message(msg.chat.id, "已保存监控信息")
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-
-                    match first_init_read(msg.clone()).await {
-                        Ok(message) => {
-                            bot.send_message(msg.chat.id, message)
-                                .parse_mode(ParseMode::MarkdownV2)
-                                .reply_parameters(ReplyParameters::new(msg.id))
-                                .await?;
-                        }
-                        Err(e) => {
-                            bot.send_message(
-                                msg.chat.id,
-                                format!("获取站点信息失败，已自动删除用户信息: {e}"),
-                            )
-                            .reply_parameters(ReplyParameters::new(msg.id))
-                            .await?;
-
-                            match delete_monitor(db_pool, msg.clone()).await {
-                                Ok(()) => return Ok(()),
-                                Err(e) => {
-                                    bot.send_message(
-                                        msg.chat.id,
-                                        format!("取消连接到 Komari 失败: {e}"),
-                                    )
-                                    .reply_parameters(ReplyParameters::new(msg.id))
-                                    .await?;
-                                }
-                            }
-                        }
-                    }
-
-                    Ok(())
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("保存监控信息失败: {e}"))
+                    bot.send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
-                    Ok(())
                 }
-            }
+            };
+            Ok(())
         }
         Command::Disconnect => {
             let db_pool = DB_POOL
                 .get()
                 .unwrap_or_else(|| panic!("数据库连接池未初始化"));
 
-            match delete_monitor(db_pool, msg.clone()).await {
+            match delete_monitor(db_pool, telegram_id).await {
                 Ok(()) => {
                     bot.send_message(msg.chat.id, "已取消连接到 Komari")
                         .reply_parameters(ReplyParameters::new(msg.id))
@@ -347,15 +302,15 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             }
         }
         Command::Update => {
-            match first_init_read(msg.clone()).await {
+            match update_connection(telegram_id).await {
                 Ok(message) => {
-                    bot.send_message(msg.chat.id, message)
+                    bot.send_message(msg.chat.id, msg_fixer(message))
                         .parse_mode(ParseMode::MarkdownV2)
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("更新站点信息失败: {e}"))
+                    bot.send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
                 }
@@ -363,8 +318,8 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 
             Ok(())
         }
-        Command::GetNodeId => match ws_get_node_id(msg.clone()).await {
-            Ok(message) => {
+        Command::GetNodeId => match get_node_id_list(telegram_id).await {
+            Ok((message, _, _)) => {
                 bot.send_message(msg.chat.id, msg_fixer(message))
                     .parse_mode(ParseMode::MarkdownV2)
                     .reply_parameters(ReplyParameters::new(msg.id))
@@ -379,58 +334,37 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             }
         },
         Command::TotalStatus => {
-            let telegram_id = if let Some(user) = msg.from {
-                user.id.0 as i64
-            } else {
-                return Ok(());
-            };
-
-            let message_str = match parse_ws_total_status(telegram_id).await {
-                Ok(message_str) => message_str,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法解析 Komari Websocket 数据: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            bot.send_message(msg.chat.id, message_str)
-                .parse_mode(ParseMode::MarkdownV2)
-                .reply_parameters(ReplyParameters::new(msg.id))
-                .disable_link_preview(true)
-                .await?;
+            // let message_str = match parse_ws_total_status(telegram_id).await {
+            //     Ok(message_str) => message_str,
+            //     Err(e) => {
+            //         bot.send_message(msg.chat.id, format!("无法解析 Komari Websocket 数据: {e}"))
+            //             .reply_parameters(ReplyParameters::new(msg.id))
+            //             .await?;
+            //         return Ok(());
+            //     }
+            // };
+            //
+            // bot.send_message(msg.chat.id, message_str)
+            //     .parse_mode(ParseMode::MarkdownV2)
+            //     .reply_parameters(ReplyParameters::new(msg.id))
+            //     .disable_link_preview(true)
+            //     .await?;
 
             Ok(())
         }
         Command::Status { node_name } => {
-            let telegram_id = if let Some(user) = msg.clone().from {
-                user.id.0 as i64
-            } else {
-                return Ok(());
-            };
+            let (msg_str, all_info, node_id) =
+                match get_node_id_by_name(telegram_id, node_name).await {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
+                            .reply_parameters(ReplyParameters::new(msg.id))
+                            .await?;
+                        return Ok(());
+                    }
+                };
 
-            let node_id = match get_node_id_by_name(msg.clone(), node_name).await {
-                Ok(node_id) => node_id,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法获取节点ID: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            let msg_str = match parse_ws_single_server_by_index(telegram_id, node_id).await {
-                Ok(msg) => msg,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            let keyboard = match make_keyboard_for_single(node_id, telegram_id).await {
+            let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
                 Ok(key) => key,
                 Err(e) => {
                     bot.send_message(msg.chat.id, format!("无法生成键盘: {e}"))
@@ -450,13 +384,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Ok(())
         }
         Command::StatusId { node_id } => {
-            let telegram_id = if let Some(user) = msg.from {
-                user.id.0 as i64
-            } else {
-                return Ok(());
-            };
-
-            let msg_str = match parse_ws_single_server_by_index(telegram_id, node_id).await {
+            let (msg_str, all_info) = match status_with_id(telegram_id, node_id as u32).await {
                 Ok(msg) => msg,
                 Err(e) => {
                     bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
@@ -466,7 +394,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 }
             };
 
-            let keyboard = match make_keyboard_for_single(node_id, telegram_id).await {
+            let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
                 Ok(key) => key,
                 Err(e) => {
                     bot.send_message(msg.chat.id, format!("无法生成键盘: {e}"))
@@ -493,7 +421,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 return Ok(());
             }
 
-            match generate_notification_token(msg.clone()).await {
+            match generate_notification_token(telegram_id).await {
                 Ok(message) => {
                     bot.send_message(msg.chat.id, message)
                         .parse_mode(ParseMode::MarkdownV2)
@@ -544,30 +472,49 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
             return Ok(());
         }
 
-        let msg_str = match parse_ws_single_server_by_index(telegram_id, node_id).await {
+        let (msg_str, all_info) = match status_with_id(telegram_id, node_id as u32).await {
             Ok(msg) => msg,
             Err(e) => {
                 if let Some(message) = q.regular_message() {
                     bot.edit_text(message, format!("无法解析 Komari 数据: {e}"))
+                        .parse_mode(ParseMode::MarkdownV2)
+                        .disable_link_preview(true)
                         .await?;
                 } else if let Some(id) = q.inline_message_id {
                     bot.edit_message_text_inline(id, format!("无法解析 Komari 数据: {e}"))
+                        .parse_mode(ParseMode::MarkdownV2)
                         .await?;
                 }
+                return Ok(());
+            }
+        };
 
+        let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
+            Ok(key) => key,
+            Err(e) => {
+                if let Some(message) = q.regular_message() {
+                    bot.edit_text(message, format!("无法生成键盘: {e}"))
+                        .parse_mode(ParseMode::MarkdownV2)
+                        .disable_link_preview(true)
+                        .await?;
+                } else if let Some(id) = q.inline_message_id {
+                    bot.edit_message_text_inline(id, format!("无法生成键盘: {e}"))
+                        .parse_mode(ParseMode::MarkdownV2)
+                        .await?;
+                }
                 return Ok(());
             }
         };
 
         if let Some(message) = q.regular_message() {
             bot.edit_text(message, msg_str)
-                .reply_markup(make_keyboard_for_single(node_id, q.from.id.0 as i64).await?)
+                .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
                 .disable_link_preview(true)
                 .await?;
         } else if let Some(id) = q.inline_message_id {
             bot.edit_message_text_inline(id, msg_str)
-                .reply_markup(make_keyboard_for_single(node_id, q.from.id.0 as i64).await?)
+                .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
                 .await?;
         }
