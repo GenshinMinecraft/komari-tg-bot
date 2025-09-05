@@ -1,4 +1,3 @@
-use crate::db::DB_POOL;
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::query::AllInfo;
