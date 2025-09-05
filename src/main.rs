@@ -221,13 +221,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 r"Komari Unofficial Telegram Bot
 /start, /help - 打印本菜单
 
-/connect HTTP_URL - 连接到 Komari 服务 (自动推断 WebSocket URL\)
+/connect HTTP_URL - 连接到 Komari 服务 (自动推断 WebSocket URL)
 /disconnect - 断开已保存的连接
-/update - 更新已保存的连接 (增删服务器或疑难杂症可使用\)
+/update - 更新已保存的连接 (增删服务器或疑难杂症可使用)
 
 /total_status - 获取所有节点的运行状态
-/status NODE_NAME - 获取指定节点的运行状态 (第一个包含 NODE_NAME 字符串的节点，若未传入则等同于 /status_id 1\)
-/get_node_id - 获取所有节点的 ID (仅本 Bot\)
+/status NODE_NAME - 获取指定节点的运行状态 (第一个包含 NODE_NAME 字符串的节点，若未传入则等同于 /status_id 1)
+/get_node_id - 获取所有节点的 ID (仅本 Bot)
 /status_id NODE_ID - 获取指定节点 ID (使用 /get_node_id 获取节点的 ID) 的运行状态
 
 /generate_notification_token - 生成通知令牌
@@ -374,7 +374,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 }
             };
 
-            bot.send_message(msg.chat.id, msg_str)
+            bot.send_message(msg.chat.id, msg_fixer(msg_str))
                 .parse_mode(ParseMode::MarkdownV2)
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .reply_markup(keyboard)
@@ -404,7 +404,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 }
             };
 
-            bot.send_message(msg.chat.id, msg_str)
+            bot.send_message(msg.chat.id, msg_fixer(msg_str))
                 .parse_mode(ParseMode::MarkdownV2)
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .reply_markup(keyboard)
@@ -423,7 +423,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 
             match generate_notification_token(telegram_id).await {
                 Ok(message) => {
-                    bot.send_message(msg.chat.id, message)
+                    bot.send_message(msg.chat.id, msg_fixer(message))
                         .parse_mode(ParseMode::MarkdownV2)
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
@@ -507,13 +507,13 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         };
 
         if let Some(message) = q.regular_message() {
-            bot.edit_text(message, msg_str)
+            bot.edit_text(message, msg_fixer(msg_str))
                 .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
                 .disable_link_preview(true)
                 .await?;
         } else if let Some(id) = q.inline_message_id {
-            bot.edit_message_text_inline(id, msg_str)
+            bot.edit_message_text_inline(id, msg_fixer(msg_str))
                 .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
                 .await?;

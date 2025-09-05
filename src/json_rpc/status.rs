@@ -3,7 +3,6 @@ use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::get_node_id::{SortedNodeList, get_node_id_list};
 use crate::json_rpc::query::AllInfo;
 use crate::{ErrorString, MessageString, TelegramId};
-use futures::stream::All;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
@@ -131,7 +130,7 @@ UPDATE AT: `{}`",
             } else {
                 format!(
                     "
-GPU: {}",
+GPU: `{}`",
                     node_info.gpu_name
                 )
             }
