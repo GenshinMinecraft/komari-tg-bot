@@ -1,6 +1,5 @@
 use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::query::{AllInfo, CommonGetNodesLatestStatusSingle};
-use crate::json_rpc::status::status_with_id;
 use crate::{ErrorString, MessageString, TelegramId};
 
 type NodeUuid = String;
@@ -30,7 +29,7 @@ pub async fn get_node_id_list(
     {
         let mut counter = 0;
 
-        for (node_uuid, node) in node_list.clone() {
+        for (node_uuid, _) in node_list.clone() {
             counter += 1;
 
             // 查找uuid相符的节点并获取其名称

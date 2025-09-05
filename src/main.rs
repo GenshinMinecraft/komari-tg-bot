@@ -9,7 +9,7 @@ use crate::http_webhook::generate_notification_token;
 use crate::json_rpc::connect::{connect_komari_with_update_db, update_connection};
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::status::{get_node_id_by_name, make_keyboard_for_single, status_with_id};
-use db::{DB_POOL, connect_db, create_table, delete_monitor, insert_monitor};
+use db::{DB_POOL, connect_db, create_table, delete_monitor};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};

@@ -1,6 +1,6 @@
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
+use crate::db::DB_POOL;
 use crate::json_rpc::bytes_to_pretty_string;
-use crate::json_rpc::get_node_id::{SortedNodeList, get_node_id_list};
+use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::query::AllInfo;
 use crate::{ErrorString, MessageString, TelegramId};
 use reqwest::Url;
@@ -10,14 +10,6 @@ pub async fn status_with_id(
     telegram_id: TelegramId,
     index: u32,
 ) -> Result<(MessageString, AllInfo), ErrorString> {
-    let db = DB_POOL.get().ok_or(String::from("无法获取数据库"))?;
-
-    let Some(monitor) = query_monitor_by_telegram_id(db, telegram_id).await? else {
-        return Err(ErrorString::from(
-            "服务器未连接，请先使用 /connect [http url] 连接".to_string(),
-        ));
-    };
-
     let (_, all_info, node_id_list) = get_node_id_list(telegram_id).await?;
 
     let vec_index: usize = match index {
@@ -144,7 +136,7 @@ pub async fn get_node_id_by_name(
     telegram_id: TelegramId,
     name: String,
 ) -> Result<(MessageString, AllInfo, i32), ErrorString> {
-    let (message_str, all_info, node_list) = get_node_id_list(telegram_id).await?;
+    let (message_str, _, _) = get_node_id_list(telegram_id).await?;
 
     let mut selected_node_id = -1;
     for line in message_str.lines() {
@@ -172,10 +164,6 @@ pub async fn make_keyboard_for_single(
     telegram_id: i64,
     all_info: &AllInfo,
 ) -> Result<InlineKeyboardMarkup, ErrorString> {
-    let db_pool = DB_POOL
-        .get()
-        .unwrap_or_else(|| panic!("数据库连接池未初始化"));
-
     let max_server = all_info.common_nodes.iter().len();
 
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = vec![];

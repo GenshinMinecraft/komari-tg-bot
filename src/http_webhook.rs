@@ -1,6 +1,6 @@
-use crate::db::{get_telegram_id, query_monitor_by_telegram_id};
+use crate::db::query_monitor_by_telegram_id;
 use crate::json_rpc::create_reqwest_client;
-use crate::{ErrorString, Message, TelegramId, db};
+use crate::{ErrorString, TelegramId, db};
 use axum::{
     Router,
     extract::{Path, State},
