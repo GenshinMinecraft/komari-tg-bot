@@ -25,6 +25,8 @@ pub async fn connect_komari_with_update_db(
         "成功读取 Komari 服务信息！
 站点名称：`{site_name}`
 站点详情：`{site_description}`
+站点版本: `{site_version}`
+
 节点数量：`{nodes_count}`
 CPU 核心总数：`{cores_count}`
 内存总量：`{memory_total}`
@@ -32,6 +34,7 @@ CPU 核心总数：`{cores_count}`
 硬盘总量：`{disk_total}`",
         site_name = all_info.common_public_info.sitename,
         site_description = all_info.common_public_info.description,
+        site_version = format!("{}-{}", all_info.common_version.version, all_info.common_version.hash),
         nodes_count = all_info.common_nodes.len(),
         cores_count = all_info
             .common_nodes

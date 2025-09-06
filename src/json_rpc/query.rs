@@ -21,7 +21,7 @@ pub struct JsonRpcResponseBase {
 }
 
 const JSON_RPC_VERSION: &str = "2.0";
-const JSON_RPC_METHOD: [&str; 8] = [
+const JSON_RPC_METHOD: [&str; 9] = [
     "rpc.help",
     "rpc.methods",
     "rpc.ping",
@@ -30,6 +30,7 @@ const JSON_RPC_METHOD: [&str; 8] = [
     "common:getNodes",
     "common:getNodesLatestStatus",
     "common:getMe",
+    "common:getVersion",
 ];
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,6 +43,7 @@ pub struct AllInfo {
     pub common_nodes: CommonGetNodes,
     pub common_nodes_latest_status: CommonGetNodesLatestStatus,
     pub common_me: CommonGetMe,
+    pub common_version: CommonGetVersion,
 }
 
 pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
@@ -151,6 +153,16 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
     )
     .map_err(|e| format!("Json 解析错误: 未找到 id 为 8 的响应: {e}"))?;
 
+    let common_get_version: CommonGetVersion = serde_json::from_value(
+        json_rpc_response_body
+            .iter()
+            .find(|response| response.id == 9)
+            .ok_or_else(|| ErrorString::from("Json 解析错误: 未找到 id 为 9 的响应"))?
+            .result
+            .clone(),
+    )
+        .map_err(|e| format!("Json 解析错误: 未找到 id 为 9 的响应: {e}"))?;
+    
     Ok(AllInfo {
         rpc_help,
         rpc_methods,
@@ -160,6 +172,7 @@ pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
         common_nodes: common_get_nodes,
         common_nodes_latest_status: common_get_nodes_latest_status,
         common_me: common_get_me,
+        common_version: common_get_version,
     })
 }
 
@@ -290,4 +303,11 @@ pub struct CommonGetMe {
     pub sso_type: String,
     pub username: String,
     pub uuid: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommonGetVersion {
+    pub version: String,
+    pub hash: String,
 }
