@@ -9,7 +9,8 @@ use crate::http_webhook::generate_notification_token;
 use crate::json_rpc::connect::{connect_komari_with_update_db, update_connection};
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::status::{get_node_id_by_name, make_keyboard_for_single, status_with_id};
-use db::{DB_POOL, connect_db, create_table, delete_monitor};
+use crate::json_rpc::total_status::total_status;
+use db::{connect_db, create_table, delete_monitor, DB_POOL};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -68,7 +69,7 @@ async fn main() {
         "error" => log::Level::Error,
         _ => log::Level::Info,
     })
-    .unwrap();
+        .unwrap();
 
     unsafe {
         env::set_var("TG_TOKEN", config.telegram_token.clone());
@@ -334,21 +335,21 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             }
         },
         Command::TotalStatus => {
-            // let message_str = match parse_ws_total_status(telegram_id).await {
-            //     Ok(message_str) => message_str,
-            //     Err(e) => {
-            //         bot.send_message(msg.chat.id, format!("无法解析 Komari Websocket 数据: {e}"))
-            //             .reply_parameters(ReplyParameters::new(msg.id))
-            //             .await?;
-            //         return Ok(());
-            //     }
-            // };
-            //
-            // bot.send_message(msg.chat.id, message_str)
-            //     .parse_mode(ParseMode::MarkdownV2)
-            //     .reply_parameters(ReplyParameters::new(msg.id))
-            //     .disable_link_preview(true)
-            //     .await?;
+            let message_str = match total_status(telegram_id).await {
+                Ok(message_str) => message_str.0,
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("无法解析 Komari Websocket 数据: {e}"))
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
+                    return Ok(());
+                }
+            };
+
+            bot.send_message(msg.chat.id, msg_fixer(message_str))
+                .parse_mode(ParseMode::MarkdownV2)
+                .reply_parameters(ReplyParameters::new(msg.id))
+                .disable_link_preview(true)
+                .await?;
 
             Ok(())
         }

@@ -1,4 +1,4 @@
-use crate::db::{DB_POOL, query_monitor_by_telegram_id};
+use crate::db::{query_monitor_by_telegram_id, DB_POOL};
 use crate::json_rpc::query::{AllInfo, CommonGetNodesLatestStatusSingle};
 use crate::{ErrorString, MessageString, TelegramId};
 

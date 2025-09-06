@@ -2,6 +2,7 @@ pub mod connect;
 pub mod get_node_id;
 pub mod query;
 pub mod status;
+pub mod total_status;
 
 use crate::ErrorString;
 use reqwest::Client;

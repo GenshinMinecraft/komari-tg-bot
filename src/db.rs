@@ -37,9 +37,9 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
              notification_token TEXT
          )",
     )
-    .execute(pool)
-    .await
-    .is_ok()
+        .execute(pool)
+        .await
+        .is_ok()
     {
         Ok(())
     } else {
@@ -56,9 +56,9 @@ pub async fn query_monitor_by_telegram_id(
          FROM monitor
          WHERE telegram_id = ?",
     )
-    .bind(telegram_id)
-    .fetch_optional(pool)
-    .await;
+        .bind(telegram_id)
+        .fetch_optional(pool)
+        .await;
 
     if let Ok(monitor_result) = monitor_result {
         Ok(monitor_result)
@@ -76,12 +76,12 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
         "INSERT OR IGNORE INTO monitor (telegram_id, monitor_url, notification_token)
          VALUES (?, ?, ?)",
     )
-    .bind(monitor.telegram_id as i64)
-    .bind(monitor.monitor_url)
-    .bind(monitor.notification_token)
-    .execute(pool)
-    .await
-    .is_ok()
+        .bind(monitor.telegram_id as i64)
+        .bind(monitor.monitor_url)
+        .bind(monitor.notification_token)
+        .execute(pool)
+        .await
+        .is_ok()
     {
         Ok(())
     } else {
