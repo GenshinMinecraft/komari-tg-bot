@@ -49,14 +49,14 @@ pub struct AllInfo {
 pub async fn get_all_info(http_url: &str) -> Result<AllInfo, ErrorString> {
     let client = create_reqwest_client().await?;
 
-    let url = format!("{}/api/rpc2", http_url);
+    let url = format!("{http_url}/api/rpc2");
 
     let json_rpc_post_body = JSON_RPC_METHOD
         .iter()
         .enumerate()
         .map(|(index, method)| JsonRpcRequestBase {
             jsonrpc: JSON_RPC_VERSION.to_string(),
-            method: method.to_string(),
+            method: (*method).to_string(),
             id: (index + 1) as i64,
         })
         .collect::<Vec<_>>();

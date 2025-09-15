@@ -23,8 +23,7 @@ pub async fn status_with_id(
     let node_info = all_info
         .common_nodes
         .values()
-        .find(|n| n.uuid == *node_uuid)
-        .map(|n| n.clone())
+        .find(|n| n.uuid == *node_uuid).cloned()
         .ok_or(ErrorString::from("无法找到该服务器"))?;
 
     let (ram_used, ram_total, ram_usage) = {
@@ -108,8 +107,7 @@ CONN: `{total_tcp_connections} TCP` / `{total_udp_connections} UDP`{update_at}",
                 format!(
                     "
 
-UPDATE AT: `{}`",
-                    updated_at
+UPDATE AT: `{updated_at}`"
                 )
             } else {
                 String::new()
@@ -195,7 +193,7 @@ pub async fn make_keyboard_for_single(
     keyboard.push(first_row);
     keyboard.push(vec![InlineKeyboardButton::callback(
         "Refresh",
-        format!("{}-{}", telegram_id, now_id),
+        format!("{telegram_id}-{now_id}"),
     )]);
 
     Ok(InlineKeyboardMarkup::new(keyboard))

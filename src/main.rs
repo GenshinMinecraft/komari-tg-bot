@@ -26,6 +26,7 @@ pub type ErrorString = String;
 pub type MessageString = String; // With formated but did not escape
 pub type TelegramId = i64;
 
+#[must_use]
 pub fn msg_fixer(msg: MessageString) -> String {
     msg.replace('.', r"\.")
         .replace('-', r"\-")
@@ -76,7 +77,7 @@ async fn main() {
         env::set_var("CALLBACK_HTTP_LISTEN", config.callback_http_listen);
         env::set_var("CALLBACK_HTTP_URL", config.callback_http_url.clone());
         env::set_var("BOT_NAME", config.bot_name.clone());
-        env::set_var("ADMIN_ID", config.admin_id.to_string())
+        env::set_var("ADMIN_ID", config.admin_id.to_string());
     };
 
     info!("Starting...");
@@ -173,7 +174,7 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
         "status" => match args.first() {
             None => Ok(Some(Command::StatusId { node_id: 1 })),
             Some(node_name) => Ok(Some(Command::Status {
-                node_name: node_name.to_string(),
+                node_name: (*node_name).to_string(),
             })),
         },
         "status_id" => {
@@ -194,8 +195,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     if msg
         .clone()
         .from
-        .map(|user| user.is_channel())
-        .unwrap_or(true)
+        .is_none_or(|user| user.is_channel())
     {
         return Ok(());
     }
@@ -279,7 +279,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
                 }
-            };
+            }
             Ok(())
         }
         Command::Disconnect => {

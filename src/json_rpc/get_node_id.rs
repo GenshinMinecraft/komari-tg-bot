@@ -36,11 +36,9 @@ pub async fn get_node_id_list(
             let node_name = all_info
                 .common_nodes
                 .values()
-                .find(|n| n.uuid == node_uuid)
-                .map(|n| n.name.clone())
-                .unwrap_or_else(|| "未知节点".to_string());
+                .find(|n| n.uuid == node_uuid).map_or_else(|| "未知节点".to_string(), |n| n.name.clone());
 
-            message_str.push_str(&format!("`{}` - {}\n", counter, node_name));
+            message_str.push_str(&format!("`{counter}` - {node_name}\n"));
         }
     }
 
