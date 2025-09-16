@@ -1,4 +1,4 @@
-#![warn(clippy::all, clippy::pedantic)]
+// #![warn(clippy::all, clippy::pedantic)]
 
 mod db;
 mod http_webhook;
@@ -6,11 +6,12 @@ mod json_rpc;
 
 use crate::db::get_telegram_id;
 use crate::http_webhook::generate_notification_token;
+use crate::json_rpc::all_komari_info::get_every_one_status;
 use crate::json_rpc::connect::{connect_komari_with_update_db, update_connection};
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::status::{get_node_id_by_name, make_keyboard_for_single, status_with_id};
 use crate::json_rpc::total_status::total_status;
-use db::{connect_db, create_table, delete_monitor, DB_POOL};
+use db::{DB_POOL, connect_db, create_table, delete_monitor};
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -70,7 +71,7 @@ async fn main() {
         "error" => log::Level::Error,
         _ => log::Level::Info,
     })
-        .unwrap();
+    .unwrap();
 
     unsafe {
         env::set_var("TG_TOKEN", config.telegram_token.clone());
@@ -139,6 +140,7 @@ enum Command {
     StatusId { node_id: i32 },
     Status { node_name: String },
     GenerateNotificationToken,
+    AllInfo,
 }
 
 fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
@@ -182,6 +184,7 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
             Ok(Some(Command::StatusId { node_id }))
         }
         "generate_notification_token" => Ok(Some(Command::GenerateNotificationToken)),
+        "all_info" => Ok(Some(Command::AllInfo)),
         _ => Ok(None),
     }
 }
@@ -192,11 +195,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         Err(_) => return Ok(()),
     };
 
-    if msg
-        .clone()
-        .from
-        .is_none_or(|user| user.is_channel())
-    {
+    if msg.clone().from.is_none_or(|user| user.is_channel()) {
         return Ok(());
     }
 
@@ -437,6 +436,31 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             }
 
             Ok(())
+        }
+        Command::AllInfo => {
+            if telegram_id
+                != env::var("ADMIN_ID")
+                    .unwrap_or(String::from("5965795367"))
+                    .parse::<i64>()
+                    .unwrap_or(5965795367)
+            {
+                return Ok(());
+            }
+
+            match get_every_one_status().await {
+                Ok(message) => {
+                    bot.send_message(msg.chat.id, msg_fixer(message))
+                        .parse_mode(ParseMode::MarkdownV2)
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("无法获取所有节点信息: {e}"));
+                    return Ok(());
+                }
+            }
         }
     }
 }

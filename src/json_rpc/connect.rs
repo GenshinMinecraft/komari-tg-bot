@@ -1,7 +1,7 @@
-use crate::db::{Monitor, DB_POOL};
+use crate::db::{DB_POOL, Monitor};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::get_all_info;
-use crate::{db, ErrorString, MessageString, TelegramId};
+use crate::{ErrorString, MessageString, TelegramId, db};
 
 pub async fn connect_komari_with_update_db(
     http_url: String,

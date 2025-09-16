@@ -23,7 +23,8 @@ pub async fn status_with_id(
     let node_info = all_info
         .common_nodes
         .values()
-        .find(|n| n.uuid == *node_uuid).cloned()
+        .find(|n| n.uuid == *node_uuid)
+        .cloned()
         .ok_or(ErrorString::from("无法找到该服务器"))?;
 
     let (ram_used, ram_total, ram_usage) = {

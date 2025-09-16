@@ -1,4 +1,4 @@
-use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::query::{AllInfo, CommonGetNodesLatestStatusSingle};
 use crate::{ErrorString, MessageString, TelegramId};
 
@@ -36,7 +36,8 @@ pub async fn get_node_id_list(
             let node_name = all_info
                 .common_nodes
                 .values()
-                .find(|n| n.uuid == node_uuid).map_or_else(|| "未知节点".to_string(), |n| n.name.clone());
+                .find(|n| n.uuid == node_uuid)
+                .map_or_else(|| "未知节点".to_string(), |n| n.name.clone());
 
             message_str.push_str(&format!("`{counter}` - {node_name}\n"));
         }

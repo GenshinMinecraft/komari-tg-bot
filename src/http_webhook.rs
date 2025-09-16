@@ -1,10 +1,10 @@
 use crate::db::query_monitor_by_telegram_id;
 use crate::json_rpc::create_reqwest_client;
-use crate::{db, ErrorString, TelegramId};
+use crate::{ErrorString, TelegramId, db};
 use axum::{
+    Router,
     extract::{Path, State},
     routing::post,
-    Router,
 };
 use log::{error, info};
 use std::env;
@@ -18,7 +18,7 @@ type CallbackFunc = fn(
     String,
     String,
     String,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output=()> + Send>>;
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>;
 
 #[derive(Clone)]
 struct AppState {

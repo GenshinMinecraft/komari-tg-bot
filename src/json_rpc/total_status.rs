@@ -1,4 +1,4 @@
-use crate::db::{query_monitor_by_telegram_id, DB_POOL};
+use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::AllInfo;
 use crate::{ErrorString, MessageString, TelegramId};

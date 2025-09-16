@@ -37,9 +37,9 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
              notification_token TEXT
          )",
     )
-        .execute(pool)
-        .await
-        .is_ok()
+    .execute(pool)
+    .await
+    .is_ok()
     {
         Ok(())
     } else {
@@ -56,9 +56,9 @@ pub async fn query_monitor_by_telegram_id(
          FROM monitor
          WHERE telegram_id = ?",
     )
-        .bind(telegram_id)
-        .fetch_optional(pool)
-        .await;
+    .bind(telegram_id)
+    .fetch_optional(pool)
+    .await;
 
     if let Ok(monitor_result) = monitor_result {
         Ok(monitor_result)
@@ -76,12 +76,12 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
         "INSERT OR IGNORE INTO monitor (telegram_id, monitor_url, notification_token)
          VALUES (?, ?, ?)",
     )
-        .bind(monitor.telegram_id as i64)
-        .bind(monitor.monitor_url)
-        .bind(monitor.notification_token)
-        .execute(pool)
-        .await
-        .is_ok()
+    .bind(monitor.telegram_id as i64)
+    .bind(monitor.monitor_url)
+    .bind(monitor.notification_token)
+    .execute(pool)
+    .await
+    .is_ok()
     {
         Ok(())
     } else {
@@ -117,6 +117,17 @@ pub async fn update_notification_token(
         Ok(_) => Ok(()),
         Err(e) => Err(format!("更新 notification_token 失败: {e}")),
     }
+}
+pub async fn get_all_monitors(pool: &Pool<Sqlite>) -> Result<Vec<Monitor>, ErrorString> {
+    let monitors = sqlx::query_as::<_, Monitor>(
+        "SELECT telegram_id, monitor_url, notification_token
+         FROM monitor",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ErrorString::from(e.to_string()))?;
+
+    Ok(monitors)
 }
 
 pub fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
