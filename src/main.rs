@@ -16,11 +16,13 @@ use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::time::Duration;
 use std::{env, fs};
+use teloxide::RequestError;
 use teloxide::prelude::*;
 use teloxide::sugar::bot::BotMessagesExt;
 use teloxide::sugar::request::RequestLinkPreviewExt;
-use teloxide::types::{ParseMode, ReplyParameters};
+use teloxide::types::{ParseMode, ReplyParameters, True};
 use teloxide::utils::command::parse_command;
 
 pub type ErrorString = String;
@@ -101,25 +103,36 @@ async fn main() {
     let handler = dptree::entry()
         .branch(
             Update::filter_message().endpoint(move |bot: Bot, msg: Message| async move {
-                let Ok(bot_name) = env::var("BOT_NAME") else {
-                    log::error!("BOT_NAME 未设置");
-                    return Ok(());
-                };
+                tokio::spawn(async move {
+                    let Ok(bot_name) = env::var("BOT_NAME") else {
+                        log::error!("BOT_NAME 未设置");
+                        return;
+                    };
 
-                let command = match parse(msg.text().unwrap_or(""), bot_name.as_str()) {
-                    Ok(Some(cmd)) => {
-                        info!("接收到来自 {:?} 命令: {:?}", msg.from, cmd);
-                        cmd
-                    }
-                    _ => {
-                        return Ok(());
-                    }
-                };
-                answer(bot, msg, command).await?;
-                Ok(())
+                    let command = match parse(msg.text().unwrap_or(""), bot_name.as_str()) {
+                        Ok(Some(cmd)) => {
+                            info!("接收到来自 {:?} 命令: {:?}", msg.from, cmd);
+                            cmd
+                        }
+                        _ => {
+                            return;
+                        }
+                    };
+                    let _ = answer(bot, msg, command).await;
+                });
+
+                Ok::<(), RequestError>(())
             }),
         )
-        .branch(Update::filter_callback_query().endpoint(callback_handler));
+        .branch(Update::filter_callback_query().endpoint(
+            |bot: Bot, q: CallbackQuery| async move {
+                tokio::spawn(async move {
+                    let _ = callback_handler(bot, q).await;
+                });
+
+                Ok(())
+            },
+        ));
 
     Dispatcher::builder(bot, handler)
         .enable_ctrlc_handler()
@@ -199,6 +212,10 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         return Ok(());
     }
 
+    let bot_clone = bot.clone();
+    let chat_id = msg.chat.id;
+    let reply_id = msg.id;
+
     match cmd {
         Command::Start => {
             bot.send_message(
@@ -216,7 +233,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Ok(())
         }
         Command::Help => {
-            bot.send_message(
+            let msg = bot.send_message(
                 msg.chat.id,
                 r"Komari Unofficial Telegram Bot
 /start, /help - 打印本菜单
@@ -236,24 +253,32 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .disable_link_preview(true)
                 .await?;
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            bot.delete(&msg).await?;
             Ok(())
         }
         Command::Connect { http_url } => {
             let url = match Url::parse(&http_url) {
                 Ok(url) => url,
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无效的 URL: {e}"))
+                    let msg = bot
+                        .send_message(msg.chat.id, format!("无效的 URL: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                     return Ok(());
                 }
             };
 
             let host = match url.host_str() {
                 None => {
-                    bot.send_message(msg.chat.id, "无效的 URL")
+                    let msg = bot
+                        .send_message(msg.chat.id, "无效的 URL")
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                     return Ok(());
                 }
                 Some(host) => host,
@@ -274,9 +299,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                         .await?;
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
+                    let msg = bot
+                        .send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                 }
             }
             Ok(())
@@ -288,15 +317,21 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 
             match delete_monitor(db_pool, telegram_id).await {
                 Ok(()) => {
-                    bot.send_message(msg.chat.id, "已取消连接到 Komari")
+                    let msg = bot
+                        .send_message(msg.chat.id, "已取消连接到 Komari")
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                     Ok(())
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("取消连接到 Komari 失败: {e}"))
+                    let msg = bot
+                        .send_message(msg.chat.id, format!("取消连接到 Komari 失败: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                     Ok(())
                 }
             }
@@ -310,9 +345,12 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                         .await?;
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
+                    let msg = bot
+                        .send_message(msg.chat.id, format!("获取站点信息失败: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await?;
                 }
             }
 
@@ -327,97 +365,135 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 Ok(())
             }
             Err(e) => {
-                bot.send_message(msg.chat.id, format!("无法获取节点ID: {e}"))
+                let msg = bot
+                    .send_message(msg.chat.id, format!("无法获取节点ID: {e}"))
                     .reply_parameters(ReplyParameters::new(msg.id))
                     .await?;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                bot.delete(&msg).await?;
                 Ok(())
             }
         },
         Command::TotalStatus => {
-            let message_str = match total_status(telegram_id).await {
-                Ok(message_str) => message_str.0,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法解析 Komari Websocket 数据: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
+            tokio::spawn(async move {
+                let message_str = match total_status(telegram_id).await {
+                    Ok(message_str) => message_str.0,
+                    Err(e) => {
+                        let _ = bot_clone
+                            .send_message(chat_id, format!("无法解析 Komari Websocket 数据: {e}"))
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await;
+                        return;
+                    }
+                };
 
-            bot.send_message(msg.chat.id, msg_fixer(message_str))
-                .parse_mode(ParseMode::MarkdownV2)
-                .reply_parameters(ReplyParameters::new(msg.id))
-                .disable_link_preview(true)
-                .await?;
+                let _ = bot_clone
+                    .send_message(chat_id, msg_fixer(message_str))
+                    .parse_mode(ParseMode::MarkdownV2)
+                    .reply_parameters(ReplyParameters::new(reply_id))
+                    .disable_link_preview(true)
+                    .await;
+            });
 
             Ok(())
         }
         Command::Status { node_name } => {
-            let (msg_str, all_info, node_id) =
-                match get_node_id_by_name(telegram_id, node_name).await {
-                    Ok(msg) => msg,
+            tokio::spawn(async move {
+                let (msg_str, all_info, node_id) =
+                    match get_node_id_by_name(telegram_id, node_name).await {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            if let Ok(msg) = bot_clone
+                                .send_message(chat_id, format!("无法解析 Komari 数据: {e}"))
+                                .reply_parameters(ReplyParameters::new(reply_id))
+                                .await
+                            {
+                                tokio::time::sleep(Duration::from_secs(5)).await;
+                                bot.delete(&msg).await.unwrap_or(True);
+                            };
+                            return;
+                        }
+                    };
+
+                let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await
+                {
+                    Ok(key) => key,
                     Err(e) => {
-                        bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
-                            .reply_parameters(ReplyParameters::new(msg.id))
-                            .await?;
-                        return Ok(());
+                        if let Ok(msg) = bot_clone
+                            .send_message(chat_id, format!("无法生成键盘: {e}"))
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await
+                        {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            bot.delete(&msg).await.unwrap_or(True);
+                        };
+                        return;
                     }
                 };
 
-            let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
-                Ok(key) => key,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法生成键盘: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
-
-            bot.send_message(msg.chat.id, msg_fixer(msg_str))
-                .parse_mode(ParseMode::MarkdownV2)
-                .reply_parameters(ReplyParameters::new(msg.id))
-                .reply_markup(keyboard)
-                .disable_link_preview(true)
-                .await?;
+                let _ = bot_clone
+                    .send_message(chat_id, msg_fixer(msg_str))
+                    .parse_mode(ParseMode::MarkdownV2)
+                    .reply_parameters(ReplyParameters::new(reply_id))
+                    .reply_markup(keyboard)
+                    .disable_link_preview(true)
+                    .await;
+            });
 
             Ok(())
         }
         Command::StatusId { node_id } => {
-            let (msg_str, all_info) = match status_with_id(telegram_id, node_id as u32).await {
-                Ok(msg) => msg,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法解析 Komari 数据: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
+            tokio::spawn(async move {
+                let (msg_str, all_info) = match status_with_id(telegram_id, node_id as u32).await {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        if let Ok(msg) = bot_clone
+                            .send_message(chat_id, format!("无法解析 Komari 数据: {e}"))
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await
+                        {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            bot.delete(&msg).await.unwrap_or(True);
+                        };
+                        return;
+                    }
+                };
 
-            let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
-                Ok(key) => key,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法生成键盘: {e}"))
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
-                    return Ok(());
-                }
-            };
+                let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await
+                {
+                    Ok(key) => key,
+                    Err(e) => {
+                        if let Ok(msg) = bot_clone
+                            .send_message(chat_id, format!("无法生成键盘: {e}"))
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await
+                        {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            bot.delete(&msg).await.unwrap_or(True);
+                        };
+                        return;
+                    }
+                };
 
-            bot.send_message(msg.chat.id, msg_fixer(msg_str))
-                .parse_mode(ParseMode::MarkdownV2)
-                .reply_parameters(ReplyParameters::new(msg.id))
-                .reply_markup(keyboard)
-                .disable_link_preview(true)
-                .await?;
+                let _ = bot_clone
+                    .send_message(chat_id, msg_fixer(msg_str))
+                    .parse_mode(ParseMode::MarkdownV2)
+                    .reply_parameters(ReplyParameters::new(reply_id))
+                    .reply_markup(keyboard)
+                    .disable_link_preview(true)
+                    .await;
+            });
 
             Ok(())
         }
         Command::GenerateNotificationToken => {
             if !msg.chat.is_private() {
-                bot.send_message(msg.chat.id, "此命令只能用于私聊")
+                let msg = bot
+                    .send_message(msg.chat.id, "此命令只能用于私聊")
                     .reply_parameters(ReplyParameters::new(msg.id))
                     .await?;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                bot.delete(&msg).await.unwrap_or(True);
                 return Ok(());
             }
 
@@ -429,9 +505,12 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                         .await?;
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法生成通知令牌: {e}"))
+                    let msg = bot
+                        .send_message(msg.chat.id, format!("无法生成通知令牌: {e}"))
                         .reply_parameters(ReplyParameters::new(msg.id))
                         .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    bot.delete(&msg).await.unwrap_or(True);
                 }
             }
 
@@ -447,27 +526,36 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 return Ok(());
             }
 
-            match get_every_one_status().await {
-                Ok(message) => {
-                    bot.send_message(msg.chat.id, msg_fixer(message))
-                        .parse_mode(ParseMode::MarkdownV2)
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
+            tokio::spawn(async move {
+                match get_every_one_status().await {
+                    Ok(message) => {
+                        let _ = bot_clone
+                            .send_message(chat_id, msg_fixer(message))
+                            .parse_mode(ParseMode::MarkdownV2)
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await;
+                    }
+                    Err(e) => {
+                        if let Ok(msg) = bot_clone
+                            .send_message(chat_id, format!("无法获取所有节点信息: {e}"))
+                            .reply_parameters(ReplyParameters::new(reply_id))
+                            .await
+                        {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            bot.delete(&msg).await.unwrap_or(True);
+                        };
+                    }
+                }
+            });
 
-                    return Ok(());
-                }
-                Err(e) => {
-                    bot.send_message(msg.chat.id, format!("无法获取所有节点信息: {e}"));
-                    return Ok(());
-                }
-            }
+            Ok(())
         }
     }
 }
 
 async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Error + Send + Sync>> {
     if let Some(ref node_id) = q.data {
-        bot.answer_callback_query(q.id.clone()).await?;
+        let _ = bot.answer_callback_query(q.id.clone()).await;
 
         let (callback_tg_id, node_id) = {
             let split: Vec<String> = node_id
@@ -501,14 +589,16 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
             Ok(msg) => msg,
             Err(e) => {
                 if let Some(message) = q.regular_message() {
-                    bot.edit_text(message, format!("无法解析 Komari 数据: {e}"))
+                    let _ = bot
+                        .edit_text(message, format!("无法解析 Komari 数据: {e}"))
                         .parse_mode(ParseMode::MarkdownV2)
                         .disable_link_preview(true)
-                        .await?;
+                        .await;
                 } else if let Some(id) = q.inline_message_id {
-                    bot.edit_message_text_inline(id, format!("无法解析 Komari 数据: {e}"))
+                    let _ = bot
+                        .edit_message_text_inline(id, format!("无法解析 Komari 数据: {e}"))
                         .parse_mode(ParseMode::MarkdownV2)
-                        .await?;
+                        .await;
                 }
                 return Ok(());
             }
@@ -518,30 +608,34 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
             Ok(key) => key,
             Err(e) => {
                 if let Some(message) = q.regular_message() {
-                    bot.edit_text(message, format!("无法生成键盘: {e}"))
+                    let _ = bot
+                        .edit_text(message, format!("无法生成键盘: {e}"))
                         .parse_mode(ParseMode::MarkdownV2)
                         .disable_link_preview(true)
-                        .await?;
+                        .await;
                 } else if let Some(id) = q.inline_message_id {
-                    bot.edit_message_text_inline(id, format!("无法生成键盘: {e}"))
+                    let _ = bot
+                        .edit_message_text_inline(id, format!("无法生成键盘: {e}"))
                         .parse_mode(ParseMode::MarkdownV2)
-                        .await?;
+                        .await;
                 }
                 return Ok(());
             }
         };
 
         if let Some(message) = q.regular_message() {
-            bot.edit_text(message, msg_fixer(msg_str))
+            let _ = bot
+                .edit_text(message, msg_fixer(msg_str))
                 .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
                 .disable_link_preview(true)
-                .await?;
+                .await;
         } else if let Some(id) = q.inline_message_id {
-            bot.edit_message_text_inline(id, msg_fixer(msg_str))
+            let _ = bot
+                .edit_message_text_inline(id, msg_fixer(msg_str))
                 .reply_markup(keyboard)
                 .parse_mode(ParseMode::MarkdownV2)
-                .await?;
+                .await;
         }
     }
 
