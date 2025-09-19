@@ -79,8 +79,8 @@ LOAD: `{load1:.2}` / `{load5:.2}` / `{load15:.2}`
 PROC: `{processes}`
 
 NET: `{total_net_down}` / `{total_net_up}`
-UP: `{net_down:.2} Mbps`
-DOWN: `{net_up:.2} Mbps`
+UP: `{net_up:.2} Mbps`
+DOWN: `{net_down:.2} Mbps`
 CONN: `{total_tcp_connections} TCP` / `{total_udp_connections} UDP`{update_at}",
         title = all_info.common_public_info.sitename,
         region = node_info.region,
