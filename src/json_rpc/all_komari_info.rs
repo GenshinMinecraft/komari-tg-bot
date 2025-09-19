@@ -3,20 +3,18 @@ use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::{AllInfo, get_all_info};
 use crate::{ErrorString, MessageString};
 use log::error;
+use teloxide::dptree::filter;
 use tokio::sync::mpsc;
 
 pub fn filter_valid_all_info(all_infos: Vec<AllInfo>) -> Vec<AllInfo> {
     all_infos
         .into_iter()
         .filter(|all_info| {
-            let total_cpu_cores: i64 = all_info
+            all_info
                 .common_nodes
                 .iter()
-                .map(|node| node.1.cpu_cores)
-                .sum();
-
-            let if_total_cpu_cores = total_cpu_cores <= 384;
-            if_total_cpu_cores
+                .filter(|node| node.1.cpu_cores >= 384)
+                .count() >= 1
         })
         .collect()
 }
