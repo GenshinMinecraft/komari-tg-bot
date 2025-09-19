@@ -12,9 +12,8 @@ pub fn filter_valid_all_info(all_infos: Vec<AllInfo>) -> Vec<AllInfo> {
         .filter(|all_info| {
             all_info
                 .common_nodes
-                .iter()
-                .filter(|node| node.1.cpu_cores >= 384)
-                .count() >= 1
+                .values()
+                .all(|node| node.cpu_cores <= 384)
         })
         .collect()
 }
