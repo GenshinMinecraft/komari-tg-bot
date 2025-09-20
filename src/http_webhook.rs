@@ -4,12 +4,12 @@ use crate::{ErrorString, TelegramId, db};
 use axum::{
     Router,
     extract::{Path, State},
-    routing::post,
 };
 use log::{error, info};
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use axum::routing::post;
 use tokio::sync::Mutex;
 use urlencoding::encode;
 

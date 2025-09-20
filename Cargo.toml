@@ -5,14 +5,14 @@ edition = "2024"
 
 [dependencies]
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
-teloxide = { version = "0.17.0", features = ["full"] }
+teloxide = { version = "0.17.0", default-features = false, features = ["rustls", "ctrlc_handler", "macros"] }
 log = { version = "0.4.28", features = ["std"] }
 simple_logger = { version = "5.0.0", features = ["colored", "colors", "stderr"] }
-reqwest = { version = "0.12.23", default-features = false, features = ["json", "rustls-tls"] }
-sqlx = { version = "0.8.6", default-features = false, features = ["sqlite"] }
-serde = { version = "1.0.219", default-features = false, features = ["std"] }
-serde_json = { version = "1.0.143", default-features = false, features = ["std"] }
-axum = { version = "0.8.4", default-features = false, features = ["tokio", "macros"] }
+reqwest = { version = "0.12.23", default-features = false, features = ["json", "rustls-tls", "__rustls-ring"] }
+sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "macros"] }
+serde = { version = "1.0.225", default-features = false, features = ["std"] }
+serde_json = { version = "1.0.145", default-features = false, features = ["std"] }
+axum = { version = "0.8.4", default-features = false, features = ["tokio", "macros", "http1"] }
 uuid = { version = "1.18.1", default-features = false, features = ["std", "v4"] }
 urlencoding = "2.1.3"
 

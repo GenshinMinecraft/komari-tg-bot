@@ -1,12 +1,12 @@
 use crate::{ErrorString, TelegramId};
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::{FromRow, Pool, Sqlite};
+use sqlx::{Pool, Sqlite};
 use teloxide::types::Message;
 use tokio::sync::OnceCell;
 
 pub static DB_POOL: OnceCell<Pool<Sqlite>> = OnceCell::const_new();
 
-#[derive(Debug, FromRow, Clone)]
+#[derive(Debug, sqlx::FromRow, Clone)]
 pub struct Monitor {
     pub telegram_id: u64,
     pub monitor_url: String,

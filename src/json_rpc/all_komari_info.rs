@@ -3,7 +3,6 @@ use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::{AllInfo, get_all_info};
 use crate::{ErrorString, MessageString};
 use log::error;
-use teloxide::dptree::filter;
 use tokio::sync::mpsc;
 
 pub fn filter_valid_all_info(all_infos: Vec<AllInfo>) -> Vec<AllInfo> {
