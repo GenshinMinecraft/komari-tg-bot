@@ -1,10 +1,10 @@
+use crate::MessageString;
 use crate::db::{DB_POOL, Monitor, get_all_monitors};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::{AllInfo, get_all_info};
-use crate::{MessageString};
+use crate::utils::ErrorType;
 use log::error;
 use tokio::sync::mpsc;
-use crate::utils::ErrorType;
 
 pub fn filter_valid_all_info(all_infos: Vec<AllInfo>) -> Vec<AllInfo> {
     all_infos
@@ -19,7 +19,9 @@ pub fn filter_valid_all_info(all_infos: Vec<AllInfo>) -> Vec<AllInfo> {
 }
 
 pub async fn get_every_one_status() -> Result<MessageString, ErrorType> {
-    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {
+        error: "无法获取数据库".to_string(),
+    })?;
 
     let monitors: Vec<Monitor> = get_all_monitors(db).await?;
 

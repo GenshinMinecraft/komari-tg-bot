@@ -1,7 +1,7 @@
 use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::query::{AllInfo, CommonGetNodesLatestStatusSingle};
-use crate::{MessageString, TelegramId};
 use crate::utils::ErrorType;
+use crate::{MessageString, TelegramId};
 
 type NodeUuid = String;
 pub type SortedNodeList = Vec<(NodeUuid, CommonGetNodesLatestStatusSingle)>;
@@ -9,7 +9,9 @@ pub type SortedNodeList = Vec<(NodeUuid, CommonGetNodesLatestStatusSingle)>;
 pub async fn get_node_id_list(
     telegram_id: TelegramId,
 ) -> Result<(MessageString, AllInfo, SortedNodeList), ErrorType> {
-    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {
+        error: "无法获取数据库".to_string(),
+    })?;
 
     let Some(monitor) = query_monitor_by_telegram_id(db, telegram_id).await? else {
         return Err(ErrorType::UserNotConnected);

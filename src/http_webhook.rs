@@ -1,5 +1,6 @@
 use crate::db::query_monitor_by_telegram_id;
 use crate::json_rpc::create_reqwest_client;
+use crate::utils::ErrorType;
 use crate::{TelegramId, db};
 use axum::routing::post;
 use axum::{
@@ -12,7 +13,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use urlencoding::encode;
-use crate::utils::ErrorType;
 
 type CallbackFunc = fn(
     String,
@@ -143,11 +143,12 @@ pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<Stri
         .get()
         .unwrap_or_else(|| panic!("数据库连接池未初始化"));
 
-    db::update_notification_token(db_pool, telegram_id, new_uuid.clone())
-        .await?;
+    db::update_notification_token(db_pool, telegram_id, new_uuid.clone()).await?;
 
     let Ok(callback_http_url) = env::var("CALLBACK_HTTP_URL") else {
-        return Err(ErrorType::EnvironmentVariablesUndefined { var: String::from("CALLBACK_HTTP_URL") });
+        return Err(ErrorType::EnvironmentVariablesUndefined {
+            var: String::from("CALLBACK_HTTP_URL"),
+        });
     };
 
     let body = r#"{"message":"{{message}}", "title":"{{title}}"}"#;

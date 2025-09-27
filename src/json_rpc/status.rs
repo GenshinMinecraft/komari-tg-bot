@@ -1,10 +1,10 @@
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::query::AllInfo;
+use crate::utils::ErrorType;
 use crate::{MessageString, TelegramId};
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
-use crate::utils::ErrorType;
 
 pub async fn status_with_id(
     telegram_id: TelegramId,
@@ -139,15 +139,17 @@ pub async fn get_node_id_by_name(
 
     let mut selected_node_id = -1;
     for line in message_str.lines() {
-        let (node_id, node_name) = line
-            .split_once(" - ")
-            .ok_or(ErrorType::GeneralError {error: String::from("无法解析节点 ID")})?;
+        let (node_id, node_name) = line.split_once(" - ").ok_or(ErrorType::GeneralError {
+            error: String::from("无法解析节点 ID"),
+        })?;
 
         selected_node_id = if node_name.contains(name.as_str()) {
             node_id
                 .trim_matches('`')
                 .parse::<i32>()
-                .map_err(|_| ErrorType::GeneralError {error: String::from("无法解析节点 ID")})?
+                .map_err(|_| ErrorType::GeneralError {
+                    error: String::from("无法解析节点 ID"),
+                })?
         } else {
             continue;
         };

@@ -1,14 +1,16 @@
 use crate::db::{DB_POOL, Monitor};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::get_all_info;
-use crate::{MessageString, TelegramId, db};
 use crate::utils::ErrorType;
+use crate::{MessageString, TelegramId, db};
 
 pub async fn connect_komari_with_update_db(
     http_url: String,
     telegram_id: TelegramId,
 ) -> Result<MessageString, ErrorType> {
-    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {
+        error: "无法获取数据库".to_string(),
+    })?;
 
     let all_info = get_all_info(&http_url).await?;
 
@@ -72,7 +74,9 @@ CPU 核心总数：`{cores_count}`
 }
 
 pub async fn update_connection(telegram_id: TelegramId) -> Result<MessageString, ErrorType> {
-    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {
+        error: "无法获取数据库".to_string(),
+    })?;
 
     let monitor = db::query_monitor_by_telegram_id(db, telegram_id)
         .await?

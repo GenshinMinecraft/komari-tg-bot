@@ -1,6 +1,6 @@
-use std::fmt::Formatter;
 use crate::MessageString;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 
 #[must_use]
 pub fn msg_fixer(msg: MessageString) -> String {
@@ -27,14 +27,15 @@ fn mask_url(text: &str) -> String {
     use regex::Regex;
     let url_regex = Regex::new(r"(https?://)([^/\s]+)([^\s]*)").unwrap();
 
-    url_regex.replace_all(text, |caps: &regex::Captures| {
-        let protocol = &caps[1];
-        let _ = &caps[2];
-        let rest = &caps[3];
-        format!("{}***{}", protocol, rest)
-    }).to_string()
+    url_regex
+        .replace_all(text, |caps: &regex::Captures| {
+            let protocol = &caps[1];
+            let _ = &caps[2];
+            let rest = &caps[3];
+            format!("{}***{}", protocol, rest)
+        })
+        .to_string()
 }
-
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
@@ -83,7 +84,10 @@ impl std::fmt::Display for ErrorType {
                 write!(f, "JSON 解析错误: {}", error)
             }
             ErrorType::UnableToFindServerByUUID => {
-                write!(f, "找不到指定 UUID 的服务器，请检查是否在 Komari 后台新建机器后，未连接上报导致无数据")
+                write!(
+                    f,
+                    "找不到指定 UUID 的服务器，请检查是否在 Komari 后台新建机器后，未连接上报导致无数据"
+                )
             }
             ErrorType::GeneralError { error } => {
                 write!(f, "发生错误: {}", error)

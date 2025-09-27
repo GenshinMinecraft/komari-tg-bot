@@ -1,13 +1,13 @@
 use crate::db::{DB_POOL, query_monitor_by_telegram_id};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::AllInfo;
-use crate::{MessageString, TelegramId};
 use crate::utils::ErrorType;
+use crate::{MessageString, TelegramId};
 
-pub async fn total_status(
-    telegram_id: TelegramId,
-) -> Result<(MessageString, AllInfo), ErrorType> {
-    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
+pub async fn total_status(telegram_id: TelegramId) -> Result<(MessageString, AllInfo), ErrorType> {
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {
+        error: "无法获取数据库".to_string(),
+    })?;
 
     let Some(monitor) = query_monitor_by_telegram_id(db, telegram_id).await? else {
         return Err(ErrorType::UserNotConnected);
