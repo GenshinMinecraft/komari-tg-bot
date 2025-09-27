@@ -3,6 +3,7 @@
 mod db;
 mod http_webhook;
 mod json_rpc;
+mod utils;
 
 use crate::db::get_telegram_id;
 use crate::http_webhook::generate_notification_token;
@@ -11,6 +12,7 @@ use crate::json_rpc::connect::{connect_komari_with_update_db, update_connection}
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::status::{get_node_id_by_name, make_keyboard_for_single, status_with_id};
 use crate::json_rpc::total_status::total_status;
+use crate::utils::{Config, msg_fixer, ErrorType};
 use db::{DB_POOL, connect_db, create_table, delete_monitor};
 use log::info;
 use reqwest::Url;
@@ -25,41 +27,8 @@ use teloxide::sugar::request::RequestLinkPreviewExt;
 use teloxide::types::{ParseMode, ReplyParameters, True};
 use teloxide::utils::command::parse_command;
 
-pub type ErrorString = String;
 pub type MessageString = String; // With formated but did not escape
 pub type TelegramId = i64;
-
-#[must_use]
-pub fn msg_fixer(msg: MessageString) -> String {
-    msg.replace('.', r"\.")
-        .replace('-', r"\-")
-        .replace('|', r"\|")
-        .replace('(', r"\(")
-        .replace(')', r"\)")
-        .replace('#', r"\#")
-        .replace('+', r"\+")
-        .replace('=', r"\=")
-        .replace('{', r"\{")
-        .replace('}', r"\}")
-        .replace('[', r"\[")
-        .replace(']', r"\]")
-        .replace('_', r"\_")
-        .replace('>', r"\>")
-        .replace('<', r"\<")
-        .replace('&', r"\&")
-        .replace('!', r"\!")
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-struct Config {
-    db_file: String,
-    telegram_token: String,
-    bot_name: String,
-    callback_http_listen: String,
-    callback_http_url: String,
-    log_level: String,
-    admin_id: i64,
-}
 
 #[tokio::main]
 async fn main() {
@@ -110,7 +79,7 @@ async fn main() {
                     };
 
                     let command = match parse(msg.text().unwrap_or(""), bot_name.as_str()) {
-                        Ok(Some(cmd)) => {
+                        Some(cmd) => {
                             info!("接收到来自 {:?} 命令: {:?}", msg.from, cmd);
                             cmd
                         }
@@ -156,21 +125,21 @@ enum Command {
     AllInfo,
 }
 
-fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
+fn parse(text: &str, bot_name: &str) -> Option<Command> {
     if !text.starts_with('/') {
-        return Ok(None);
+        return None;
     }
 
     let (cmd, args) = match parse_command(text, bot_name).ok_or("无法解析的命令") {
         Ok(cmd) => cmd,
-        Err(_) => return Ok(None),
+        Err(_) => return None,
     };
 
     match cmd {
-        "start" => Ok(Some(Command::Start)),
-        "help" => Ok(Some(Command::Help)),
+        "start" => Some(Command::Start),
+        "help" => Some(Command::Help),
         "connect" => {
-            let http_url = args.first().ok_or("缺少HTTP URL")?;
+            let http_url = args.first()?;
 
             let http_url = if http_url.ends_with('/') {
                 http_url.trim_end_matches('/')
@@ -178,27 +147,27 @@ fn parse(text: &str, bot_name: &str) -> Result<Option<Command>, ErrorString> {
                 http_url
             };
 
-            Ok(Some(Command::Connect {
+            Some(Command::Connect {
                 http_url: http_url.to_string(),
-            }))
+            })
         }
-        "disconnect" => Ok(Some(Command::Disconnect)),
-        "update" => Ok(Some(Command::Update)),
-        "get_node_id" => Ok(Some(Command::GetNodeId)),
-        "total_status" => Ok(Some(Command::TotalStatus)),
+        "disconnect" => Some(Command::Disconnect),
+        "update" => Some(Command::Update),
+        "get_node_id" => Some(Command::GetNodeId),
+        "total_status" => Some(Command::TotalStatus),
         "status" => match args.first() {
-            None => Ok(Some(Command::StatusId { node_id: 1 })),
-            Some(node_name) => Ok(Some(Command::Status {
+            None => Some(Command::StatusId { node_id: 1 }),
+            Some(node_name) => Some(Command::Status {
                 node_name: (*node_name).to_string(),
-            })),
+            }),
         },
         "status_id" => {
             let node_id = args.first().unwrap_or(&"1").parse::<i32>().unwrap_or(1);
-            Ok(Some(Command::StatusId { node_id }))
+            Some(Command::StatusId { node_id })
         }
-        "generate_notification_token" => Ok(Some(Command::GenerateNotificationToken)),
-        "all_info" => Ok(Some(Command::AllInfo)),
-        _ => Ok(None),
+        "generate_notification_token" => Some(Command::GenerateNotificationToken),
+        "all_info" => Some(Command::AllInfo),
+        _ => None,
     }
 }
 
@@ -415,21 +384,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                         }
                     };
 
-                let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await
-                {
-                    Ok(key) => key,
-                    Err(e) => {
-                        if let Ok(msg) = bot_clone
-                            .send_message(chat_id, format!("无法生成键盘: {e}"))
-                            .reply_parameters(ReplyParameters::new(reply_id))
-                            .await
-                        {
-                            tokio::time::sleep(Duration::from_secs(5)).await;
-                            bot.delete(&msg).await.unwrap_or(True);
-                        };
-                        return;
-                    }
-                };
+                let keyboard = make_keyboard_for_single(node_id, telegram_id, &all_info).await;
 
                 let _ = bot_clone
                     .send_message(chat_id, msg_fixer(msg_str))
@@ -459,21 +414,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                     }
                 };
 
-                let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await
-                {
-                    Ok(key) => key,
-                    Err(e) => {
-                        if let Ok(msg) = bot_clone
-                            .send_message(chat_id, format!("无法生成键盘: {e}"))
-                            .reply_parameters(ReplyParameters::new(reply_id))
-                            .await
-                        {
-                            tokio::time::sleep(Duration::from_secs(5)).await;
-                            bot.delete(&msg).await.unwrap_or(True);
-                        };
-                        return;
-                    }
-                };
+                let keyboard = make_keyboard_for_single(node_id, telegram_id, &all_info).await;
 
                 let _ = bot_clone
                     .send_message(chat_id, msg_fixer(msg_str))
@@ -604,24 +545,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
             }
         };
 
-        let keyboard = match make_keyboard_for_single(node_id, telegram_id, &all_info).await {
-            Ok(key) => key,
-            Err(e) => {
-                if let Some(message) = q.regular_message() {
-                    let _ = bot
-                        .edit_text(message, format!("无法生成键盘: {e}"))
-                        .parse_mode(ParseMode::MarkdownV2)
-                        .disable_link_preview(true)
-                        .await;
-                } else if let Some(id) = q.inline_message_id {
-                    let _ = bot
-                        .edit_message_text_inline(id, format!("无法生成键盘: {e}"))
-                        .parse_mode(ParseMode::MarkdownV2)
-                        .await;
-                }
-                return Ok(());
-            }
-        };
+        let keyboard = make_keyboard_for_single(node_id, telegram_id, &all_info).await;
 
         if let Some(message) = q.regular_message() {
             let _ = bot

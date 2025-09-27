@@ -1,13 +1,14 @@
 use crate::db::{DB_POOL, Monitor};
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::query::get_all_info;
-use crate::{ErrorString, MessageString, TelegramId, db};
+use crate::{MessageString, TelegramId, db};
+use crate::utils::ErrorType;
 
 pub async fn connect_komari_with_update_db(
     http_url: String,
     telegram_id: TelegramId,
-) -> Result<MessageString, ErrorString> {
-    let db = DB_POOL.get().ok_or(String::from("无法获取数据库"))?;
+) -> Result<MessageString, ErrorType> {
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
 
     let all_info = get_all_info(&http_url).await?;
 
@@ -70,14 +71,12 @@ CPU 核心总数：`{cores_count}`
     Ok(msg)
 }
 
-pub async fn update_connection(telegram_id: TelegramId) -> Result<MessageString, ErrorString> {
-    let db = DB_POOL.get().ok_or(String::from("无法获取数据库"))?;
+pub async fn update_connection(telegram_id: TelegramId) -> Result<MessageString, ErrorType> {
+    let db = DB_POOL.get().ok_or(ErrorType::DataBaseError {error: "无法获取数据库".to_string()})?;
 
     let monitor = db::query_monitor_by_telegram_id(db, telegram_id)
         .await?
-        .ok_or(ErrorString::from(
-            "服务器未连接，请先使用 /connect [http url] 连接".to_string(),
-        ))?;
+        .ok_or(ErrorType::UserNotConnected)?;
 
     let connection = connect_komari_with_update_db(monitor.monitor_url, telegram_id).await?;
 

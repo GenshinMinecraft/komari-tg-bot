@@ -1,6 +1,7 @@
 use crate::db::query_monitor_by_telegram_id;
 use crate::json_rpc::create_reqwest_client;
-use crate::{ErrorString, TelegramId, db};
+use crate::{TelegramId, db};
+use axum::routing::post;
 use axum::{
     Router,
     extract::{Path, State},
@@ -9,9 +10,9 @@ use log::{error, info};
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use axum::routing::post;
 use tokio::sync::Mutex;
 use urlencoding::encode;
+use crate::utils::ErrorType;
 
 type CallbackFunc = fn(
     String,
@@ -135,7 +136,7 @@ pub async fn start_server(callback: CallbackFunc) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<String, ErrorString> {
+pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<String, ErrorType> {
     let new_uuid = uuid::Uuid::new_v4().to_string();
 
     let db_pool = db::DB_POOL
@@ -143,11 +144,10 @@ pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<Stri
         .unwrap_or_else(|| panic!("数据库连接池未初始化"));
 
     db::update_notification_token(db_pool, telegram_id, new_uuid.clone())
-        .await
-        .map_err(|e| format!("无法更新数据库中的notification_token: {e}"))?;
+        .await?;
 
     let Ok(callback_http_url) = env::var("CALLBACK_HTTP_URL") else {
-        return Err("CALLBACK_HTTP_URL 未设置".to_string());
+        return Err(ErrorType::EnvironmentVariablesUndefined { var: String::from("CALLBACK_HTTP_URL") });
     };
 
     let body = r#"{"message":"{{message}}", "title":"{{title}}"}"#;
@@ -167,6 +167,6 @@ pub async fn generate_notification_token(telegram_id: TelegramId) -> Result<Stri
 
 最后选择 Method 为 `Post` 并保存
 
-请自行替换 CHAT\_ID，并确保该 Bot 可以访问到该聊天，CHAT\_ID 可从其他 Bot 获取"
+请自行替换 CHATID，并确保该 Bot 可以访问到该聊天，CHATID 可从其他 Bot 获取"
     ))
 }

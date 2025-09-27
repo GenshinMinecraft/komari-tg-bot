@@ -1,14 +1,15 @@
 use crate::json_rpc::bytes_to_pretty_string;
 use crate::json_rpc::get_node_id::get_node_id_list;
 use crate::json_rpc::query::AllInfo;
-use crate::{ErrorString, MessageString, TelegramId};
+use crate::{MessageString, TelegramId};
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+use crate::utils::ErrorType;
 
 pub async fn status_with_id(
     telegram_id: TelegramId,
     index: u32,
-) -> Result<(MessageString, AllInfo), ErrorString> {
+) -> Result<(MessageString, AllInfo), ErrorType> {
     let (_, all_info, node_id_list) = get_node_id_list(telegram_id).await?;
 
     let vec_index: usize = match index {
@@ -18,14 +19,14 @@ pub async fn status_with_id(
 
     let (node_uuid, node_latest_info) = node_id_list
         .get(vec_index)
-        .ok_or(ErrorString::from("节点不存在"))?;
+        .ok_or(ErrorType::UnableToFindServerByUUID)?;
 
     let node_info = all_info
         .common_nodes
         .values()
         .find(|n| n.uuid == *node_uuid)
         .cloned()
-        .ok_or(ErrorString::from("无法找到该服务器"))?;
+        .ok_or(ErrorType::UnableToFindServerByUUID)?;
 
     let (ram_used, ram_total, ram_usage) = {
         let ram_used = node_latest_info.ram;
@@ -133,20 +134,20 @@ GPU: `{}`",
 pub async fn get_node_id_by_name(
     telegram_id: TelegramId,
     name: String,
-) -> Result<(MessageString, AllInfo, i32), ErrorString> {
+) -> Result<(MessageString, AllInfo, i32), ErrorType> {
     let (message_str, _, _) = get_node_id_list(telegram_id).await?;
 
     let mut selected_node_id = -1;
     for line in message_str.lines() {
         let (node_id, node_name) = line
             .split_once(" - ")
-            .ok_or(String::from("无法解析节点信息"))?;
+            .ok_or(ErrorType::GeneralError {error: String::from("无法解析节点 ID")})?;
 
         selected_node_id = if node_name.contains(name.as_str()) {
             node_id
                 .trim_matches('`')
                 .parse::<i32>()
-                .map_err(|_| "无法解析节点ID")?
+                .map_err(|_| ErrorType::GeneralError {error: String::from("无法解析节点 ID")})?
         } else {
             continue;
         };
@@ -161,7 +162,7 @@ pub async fn make_keyboard_for_single(
     now_id: i32,
     telegram_id: i64,
     all_info: &AllInfo,
-) -> Result<InlineKeyboardMarkup, ErrorString> {
+) -> InlineKeyboardMarkup {
     let max_server = all_info.common_nodes.iter().len();
 
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = vec![];
@@ -197,5 +198,5 @@ pub async fn make_keyboard_for_single(
         format!("{telegram_id}-{now_id}"),
     )]);
 
-    Ok(InlineKeyboardMarkup::new(keyboard))
+    InlineKeyboardMarkup::new(keyboard)
 }

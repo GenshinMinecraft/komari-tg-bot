@@ -5,13 +5,13 @@ pub mod query;
 pub mod status;
 pub mod total_status;
 
-use crate::ErrorString;
 use reqwest::Client;
 use tokio::sync::OnceCell;
+use crate::utils::ErrorType;
 
 pub static REQWEST_CLIENT: OnceCell<reqwest::Client> = OnceCell::const_new();
 
-pub async fn create_reqwest_client() -> Result<&'static Client, String> {
+pub async fn create_reqwest_client() -> Result<&'static Client, ErrorType> {
     REQWEST_CLIENT
         .get_or_try_init(|| async {
             let client_build = reqwest::Client::builder()
@@ -20,7 +20,7 @@ pub async fn create_reqwest_client() -> Result<&'static Client, String> {
             client_build.build()
         })
         .await
-        .map_err(|e| ErrorString::from(e.to_string()))
+        .map_err(|e| ErrorType::UnableToCreateReqwestClient { error: e.to_string() })
 }
 
 pub fn bytes_to_pretty_string<T: Into<i64>>(bytes: T) -> String {

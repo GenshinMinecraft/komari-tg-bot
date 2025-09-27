@@ -1,4 +1,5 @@
-use crate::{ErrorString, TelegramId};
+use crate::TelegramId;
+use crate::utils::{ErrorString, ErrorType};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
 use teloxide::types::Message;
@@ -13,7 +14,7 @@ pub struct Monitor {
     pub notification_token: Option<String>,
 }
 
-pub async fn connect_db(sqlite_db_file: &str) -> Result<&Pool<Sqlite>, ErrorString> {
+pub async fn connect_db(sqlite_db_file: &str) -> Result<&Pool<Sqlite>, ErrorType> {
     DB_POOL
         .get_or_try_init(|| async {
             let db_url = format!("sqlite:{sqlite_db_file}");
@@ -24,12 +25,14 @@ pub async fn connect_db(sqlite_db_file: &str) -> Result<&Pool<Sqlite>, ErrorStri
                 .await
         })
         .await
-        .map_err(|e| ErrorString::from(e.to_string()))
+        .map_err(|e| ErrorType::DataBaseError {
+            error: ErrorString::from(e.to_string()),
+        })
 }
 
-pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
+pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorType> {
     // 创建表（如果不存在）
-    if sqlx::query(
+    if let Err(e) = sqlx::query(
         "CREATE TABLE IF NOT EXISTS monitor (
              id INTEGER PRIMARY KEY,
              telegram_id INTEGER NOT NULL UNIQUE,
@@ -39,18 +42,19 @@ pub async fn create_table(pool: &Pool<Sqlite>) -> Result<(), ErrorString> {
     )
     .execute(pool)
     .await
-    .is_ok()
     {
-        Ok(())
+        Err(ErrorType::DataBaseError {
+            error: ErrorString::from(e.to_string()),
+        })
     } else {
-        Err(String::from("数据库错误"))
+        Ok(())
     }
 }
 
 pub async fn query_monitor_by_telegram_id(
     pool: &Pool<Sqlite>,
     telegram_id: TelegramId,
-) -> Result<Option<Monitor>, ErrorString> {
+) -> Result<Option<Monitor>, ErrorType> {
     let monitor_result = sqlx::query_as::<_, Monitor>(
         "SELECT telegram_id, monitor_url, notification_token
          FROM monitor
@@ -63,16 +67,20 @@ pub async fn query_monitor_by_telegram_id(
     if let Ok(monitor_result) = monitor_result {
         Ok(monitor_result)
     } else {
-        Err(String::from("数据库错误"))
+        Err(ErrorType::DataBaseError {
+            error: ErrorString::from("数据库错误"),
+        })
     }
 }
 
-pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(), ErrorString> {
+pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(), ErrorType> {
     if let Ok(Some(_)) = query_monitor_by_telegram_id(pool, monitor.telegram_id as i64).await {
-        return Err(String::from("一个 Telegram 用户仅可添加一个 Komari 服务器"));
+        return Err(ErrorType::DataBaseError {
+            error: ErrorString::from("一个 Telegram 用户仅可添加一个 Komari 服务器"),
+        });
     }
 
-    if sqlx::query(
+    if let Err(e) = sqlx::query(
         "INSERT OR IGNORE INTO monitor (telegram_id, monitor_url, notification_token)
          VALUES (?, ?, ?)",
     )
@@ -81,23 +89,23 @@ pub async fn insert_monitor(pool: &Pool<Sqlite>, monitor: Monitor) -> Result<(),
     .bind(monitor.notification_token)
     .execute(pool)
     .await
-    .is_ok()
     {
-        Ok(())
+        Err(ErrorType::DataBaseError {
+            error: ErrorString::from(e.to_string()),
+        })
     } else {
-        Err(String::from("数据库错误"))
+        Ok(())
     }
 }
 
-pub async fn delete_monitor(
-    pool: &Pool<Sqlite>,
-    telegram_id: TelegramId,
-) -> Result<(), ErrorString> {
+pub async fn delete_monitor(pool: &Pool<Sqlite>, telegram_id: TelegramId) -> Result<(), ErrorType> {
     let _ = sqlx::query("DELETE FROM monitor WHERE telegram_id = ?")
         .bind(telegram_id)
         .execute(pool)
         .await
-        .map_err(|e| ErrorString::from(e.to_string()))?;
+        .map_err(|e| ErrorType::DataBaseError {
+            error: ErrorString::from(e.to_string()),
+        })?;
 
     Ok(())
 }
@@ -106,7 +114,7 @@ pub async fn update_notification_token(
     pool: &Pool<Sqlite>,
     telegram_id: TelegramId,
     token: String,
-) -> Result<(), ErrorString> {
+) -> Result<(), ErrorType> {
     let result = sqlx::query("UPDATE monitor SET notification_token = ? WHERE telegram_id = ?")
         .bind(&token)
         .bind(telegram_id)
@@ -115,26 +123,32 @@ pub async fn update_notification_token(
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("更新 notification_token 失败: {e}")),
+        Err(e) => Err(ErrorType::DataBaseError {
+            error: ErrorString::from(e.to_string()),
+        }),
     }
 }
-pub async fn get_all_monitors(pool: &Pool<Sqlite>) -> Result<Vec<Monitor>, ErrorString> {
+pub async fn get_all_monitors(pool: &Pool<Sqlite>) -> Result<Vec<Monitor>, ErrorType> {
     let monitors = sqlx::query_as::<_, Monitor>(
         "SELECT telegram_id, monitor_url, notification_token
          FROM monitor",
     )
     .fetch_all(pool)
     .await
-    .map_err(|e| ErrorString::from(e.to_string()))?;
+    .map_err(|e| ErrorType::DataBaseError {
+        error: ErrorString::from(e.to_string()),
+    })?;
 
     Ok(monitors)
 }
 
-pub fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorString> {
+pub fn get_telegram_id(msg: &Message) -> Result<TelegramId, ErrorType> {
     let telegram_id = if let Some(user) = msg.from.clone() {
         user.id.0 as i64
     } else {
-        return Err(String::from("无法获取用户ID"));
+        return Err(ErrorType::DataBaseError {
+            error: ErrorString::from("无法获取 Telegram 用户 ID"),
+        });
     };
 
     Ok(telegram_id)
