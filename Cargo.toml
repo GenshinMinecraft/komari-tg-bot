@@ -1,6 +1,6 @@
 [package]
 name = "komari-tgbot"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 
 [dependencies]
@@ -10,11 +10,12 @@ log = { version = "0.4.28", features = ["std"] }
 simple_logger = { version = "5.0.0", features = ["colored", "colors", "stderr"] }
 reqwest = { version = "0.12.23", default-features = false, features = ["json", "rustls-tls", "__rustls-ring"] }
 sqlx = { version = "0.8.6", default-features = false, features = ["sqlite", "macros"] }
-serde = { version = "1.0.225", default-features = false, features = ["std"] }
+serde = { version = "1.0.227", default-features = false, features = ["std"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["std"] }
 axum = { version = "0.8.4", default-features = false, features = ["tokio", "macros", "http1"] }
 uuid = { version = "1.18.1", default-features = false, features = ["std", "v4"] }
 urlencoding = "2.1.3"
+regex = "1.11.1"
 
 [profile]
 dev = { opt-level = 3 }
