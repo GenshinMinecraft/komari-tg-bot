@@ -25,24 +25,16 @@ pub fn msg_fixer(msg: MessageString) -> String {
 
 fn mask_url(text: &str) -> String {
     use regex::Regex;
-
-    let url_regex = Regex::new(r"https?://[^\s]+").unwrap();
+    let url_regex = Regex::new(r"(https?://)([^/\s]+)([^\s]*)").unwrap();
 
     url_regex.replace_all(text, |caps: &regex::Captures| {
-        let url = &caps[0];
-        if let Some(protocol_end) = url.find("://") {
-            let protocol = &url[..protocol_end + 3];
-            let rest = &url[protocol_end + 3..];
-            if rest.len() > 13 {
-                format!("{}{}***{}", protocol, &rest[..10], &rest[rest.len()-3..])
-            } else {
-                format!("{}***", protocol)
-            }
-        } else {
-            "***".to_string()
-        }
+        let protocol = &caps[1];
+        let _ = &caps[2];
+        let rest = &caps[3];
+        format!("{}***{}", protocol, rest)
     }).to_string()
 }
+
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
@@ -60,7 +52,6 @@ pub type ErrorString = String;
 pub enum ErrorType {
     UserNotConnected,
     DataBaseError { error: ErrorString },
-    UnableToParseCommand,
     EnvironmentVariablesUndefined { var: String },
     UnableToCreateReqwestClient { error: ErrorString },
     RequestError { error: ErrorString },
@@ -77,9 +68,6 @@ impl std::fmt::Display for ErrorType {
             }
             ErrorType::DataBaseError { error } => {
                 write!(f, "数据库错误: {}", error)
-            }
-            ErrorType::UnableToParseCommand => {
-                write!(f, "无法解析命令")
             }
             ErrorType::EnvironmentVariablesUndefined { var } => {
                 write!(f, "环境变量未定义: {}", var)
